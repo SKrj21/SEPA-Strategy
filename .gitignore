@@ -1,0 +1,10 @@
+# Stride credentials — never commit this
+.stride_auth.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
