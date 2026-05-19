@@ -20,3 +20,7 @@ isin_cache.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal depot files
+depot/Smartbroker.csv
+depot/tr_depot.csv
