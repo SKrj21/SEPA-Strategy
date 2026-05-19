@@ -1,3 +1,4 @@
+import datetime
 import json
 from pathlib import Path
 
@@ -355,6 +356,7 @@ for idx, depot in enumerate(depots):
         row["Score"] = row.get("RS Rating")
     depot_results.append((results, excluded))
 _screen_prog.empty()
+st.session_state["scan_completed_at"] = datetime.datetime.now()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -402,6 +404,35 @@ def _styled(rows: list[dict]):
     return styler
 
 
+def _build_depot_summary(depots: list[dict], depot_results: list) -> list[dict]:
+    from classifier import SIGNAL_ORDER as _SO
+    rows = []
+    for depot, (results, excluded) in zip(depots, depot_results):
+        counts = {tier: sum(1 for r in results if r.get("Signal") == tier) for tier in _SO}
+        scores = [r["Score"] for r in results if r.get("Score") is not None]
+        rows.append({
+            "Depot": depot["name"],
+            "Stocks": len(results),
+            "Score Ø": round(sum(scores) / len(scores), 1) if scores else None,
+            **{tier: counts[tier] for tier in _SO},
+            "Errors": len(excluded),
+        })
+    if len(rows) > 1:
+        totals: dict = {"Depot": "GESAMT", "Stocks": sum(r["Stocks"] for r in rows)}
+        all_scores_flat = [
+            r["Score"]
+            for results, _ in depot_results
+            for r in results
+            if r.get("Score") is not None
+        ]
+        totals["Score Ø"] = round(sum(all_scores_flat) / len(all_scores_flat), 1) if all_scores_flat else None
+        for tier in _SO:
+            totals[tier] = sum(r[tier] for r in rows)
+        totals["Errors"] = sum(r["Errors"] for r in rows)
+        rows.append(totals)
+    return rows
+
+
 # ── Section 4: Results ─────────────────────────────────────────────────────────
 st.header("4. Results")
 
@@ -410,6 +441,46 @@ tabs = st.tabs(tab_labels)
 
 # ── Overview tab ──────────────────────────────────────────────────────────────
 with tabs[0]:
+    # Status bar (W25)
+    _completed_at = st.session_state.get("scan_completed_at")
+    _refresh_mins = st.session_state.get("refresh_input_0", 60)
+    _sb_c1, _sb_c2, _sb_c3, _sb_c4 = st.columns([3, 3, 2, 2])
+    if _completed_at:
+        _sb_c1.success(f"✓ Scan completed {_completed_at.strftime('%H:%M:%S')}")
+        _sb_c2.caption(f"Last scan: {_completed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        _sb_c1.info("Scan not yet run")
+        _sb_c2.caption("")
+    _sb_c3.caption(f"Auto-scan interval: {_refresh_mins} min")
+    if _sb_c4.button("↺ Re-scan", key=_gk("rescan_overview")):
+        for k in list(st.session_state.keys()):
+            if k.startswith(("auto_load_", "depot_", "screen_")):
+                del st.session_state[k]
+        st.rerun()
+
+    # Depot-Übersicht table (W27)
+    _summary_rows = _build_depot_summary(depots, depot_results)
+    if _summary_rows:
+        st.subheader("Depot-Übersicht")
+        _summary_df = pd.DataFrame(_summary_rows)
+
+        def _style_summary(df: pd.DataFrame):
+            from classifier import SIGNAL_ORDER as _SO2
+            styler = df.style
+            tier_cols = [c for c in _SO2 if c in df.columns]
+
+            def _cell_colour(val, col):
+                if col in tier_cols and isinstance(val, (int, float)) and val > 0:
+                    return _SIGNAL_COLOURS.get(col, "")
+                return ""
+
+            for col in tier_cols:
+                apply_fn = getattr(styler, "map", None) or styler.applymap
+                styler = apply_fn(lambda v, c=col: _cell_colour(v, c), subset=[col])
+            return styler
+
+        st.dataframe(_style_summary(_summary_df), use_container_width=True)
+
     all_buy_signals = [
         {**r, "Depot": depots[i]["name"]}
         for i, (results, _) in enumerate(depot_results)
