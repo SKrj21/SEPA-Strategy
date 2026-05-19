@@ -1,0 +1,237 @@
+{
+  "source_spec": "docs/ideation/2026-05-19T125215-dynamic-signal-tiers-trend-detection-requirements.md",
+  "source_spec_sha256": "309a6eb980b48f7e46b35f219490ec6897e7ac458e48e45d2b8eb27fd20313f3",
+  "decomposition_notes": "Single-goal shape — all work is in one tightly code-coupled cluster. The requirements doc explicitly states that classifier changes and all call-site updates in app.py must happen atomically (Assumptions section), making a multi-goal split unsafe. Natural seams: (1) classifier function update in classifier.py, (2) colour mapping, SIGNAL_ORDER, and call sites in app.py, (3) test updates. Five tasks sequenced by dependency. Open questions (2-3 cond + RS 10-29 classification, depot summary table column grouping) are deferred as pitfalls, not tasks.",
+  "goals": [
+    {
+      "title": "Replace 5-tier classifier with 7-tier direction-aware classification",
+      "type": "goal",
+      "complexity": "medium",
+      "priority": "high",
+      "needs_review": false,
+      "why": "The current 5-tier snapshot system cannot distinguish a stock beginning to deteriorate from one stuck weak for weeks, and offers no signal for stocks recovering from weakness. Users act too late. The 7-tier system surfaces Warning 1-2 scans earlier and Recovered before re-qualification for Buy, while tightening the Buy RS floor from 70 to 85 to reduce false Buy signals.",
+      "what": "Update classify_signal() to implement the 7-tier evaluation order, raise _RS_BUY_MIN from 70.0 to 85.0, update SIGNAL_ORDER and colour mapping in app.py, update all tier-label string-match call sites in app.py atomically, and update tests. screener.py and indicators.py are not modified.",
+      "where_context": "classifier.py (classify_signal function), app.py (colour mapping, SIGNAL_ORDER, Buy-filter call sites, sound-alert call sites), tests/ directory",
+      "acceptance_criteria": "classify_signal() implements the 7-step evaluation order exactly as specified\n_RS_BUY_MIN is 85.0\nSIGNAL_ORDER is [Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic]\nColour mapping covers all 7 tiers with the colours from the Sketch table\nAll string-match call sites in app.py that previously referenced Bearish are updated to Warning or Chronic\nAll existing tests remain green\nNew tests cover all 7 tier return paths and RS=85 boundary",
+      "pitfalls": [
+        "screener.py and indicators.py must not be modified — classify_signal() must stay in or be moved to classifier.py",
+        "All tier-label string matches in app.py must be updated atomically — a partial update silently breaks colour mapping, Buy filters, and sound alerts without raising an exception",
+        "Stocks with 2-3 conditions and RS 10-29 are Warning (only RS < 10 triggers Sell-Panic) — do not introduce a separate RS floor for Warning",
+        "During a broad market correction many stocks may simultaneously drop to Warning — this is a known risk in Assumptions, not a bug to fix"
+      ],
+      "tasks": [
+        {
+          "title": "Audit classify_signal() location and all tier-label call sites in app.py",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Read-only audit: identify the exact file and line where classify_signal() is defined, confirm _RS_BUY_MIN location, and enumerate every place in app.py that string-matches tier labels (colour mapping dict keys, SIGNAL_ORDER list, Buy-filter conditionals, sound-alert conditionals). classifier.py already exists in the project and is the expected home — verify this. No code changes in this task.",
+          "why": "The Constraints section forbids modifying screener.py and indicators.py. Without a complete audit of call sites, a partial update will silently break colour mapping or alerts with no exception raised.",
+          "what": "Grep and read app.py, screener.py, classifier.py for: (1) definition of classify_signal() and _RS_BUY_MIN, (2) every string literal referencing Buy, Bullish, Bearish, Neutral, Sell-Panic in app.py, (3) the current SIGNAL_ORDER definition location.",
+          "where_context": "app.py, screener.py, classifier.py",
+          "acceptance_criteria": "Exact file:line of classify_signal() definition identified\nExact file:line of _RS_BUY_MIN identified\nAll string-match call sites for tier labels in app.py listed with file:line references\nCurrent SIGNAL_ORDER definition location identified",
+          "patterns_to_follow": "Use grep or file reads only — no code modifications in this task",
+          "pitfalls": [
+            "Check for tier labels in f-strings and formatted strings, not only plain string literals and dict keys"
+          ],
+          "dependencies": [],
+          "key_files": [
+            {"file_path": "app.py", "note": "Audit colour mapping, SIGNAL_ORDER, Buy filters, sound alerts", "position": 0},
+            {"file_path": "classifier.py", "note": "Verify classify_signal() and _RS_BUY_MIN are here", "position": 1},
+            {"file_path": "screener.py", "note": "Confirm classify_signal() is NOT defined here", "position": 2}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Confirm file and line number of classify_signal() definition is recorded", "expected_result": "Exact location identified", "position": 0},
+            {"step_type": "manual", "step_text": "Confirm a complete list of all tier-label string literals in app.py is recorded, covering colour mapping, SIGNAL_ORDER, and all conditionals", "expected_result": "Complete list with file:line references", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": ["Grep output confirms no tier-label string sites were missed"],
+            "edge_cases": ["Check for tier labels in f-strings, not just plain string literals"],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Implement 7-tier evaluation order in classifier.py with RS Buy threshold 85",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Update classifier.py: change _RS_BUY_MIN from 70.0 to 85.0, replace the 5-tier if/elif chain in classify_signal() with the 7-step evaluation order: (1) RS < 10 Sell-Panic, (2) cond == 8 and RS >= 85 Buy, (3) cond >= 6 and RS >= 50 Bullish, (4) cond >= 4 and RS >= 50 Recovered, (5) cond >= 4 Neutral, (6) cond >= 2 Warning, (7) else Chronic. Preserve the existing function signature and ValueError on RS=None. Do not modify screener.py or indicators.py.",
+          "why": "The core classification logic is the foundation all other tasks depend on. The worked edge case (cond=6, RS=40 must return Neutral) confirms that RS gates the upper tiers and evaluation must fall through step 5.",
+          "what": "Edit classifier.py: update _RS_BUY_MIN constant and replace the if/elif body of classify_signal(). Update SIGNAL_ORDER from 5 entries to 7 entries.",
+          "where_context": "classifier.py",
+          "acceptance_criteria": "classify_signal() returns Sell-Panic when RS < 10 regardless of cond\nclassify_signal() returns Buy only when cond == 8 and RS >= 85\nclassify_signal() returns Bullish when cond >= 6 and RS >= 50 (including cond=8 RS=50-84)\nclassify_signal() returns Recovered when cond >= 4 and RS >= 50 and cond < 6\nclassify_signal() returns Neutral when cond >= 4 and RS < 50 (including cond=6-7 RS<50)\nclassify_signal() returns Warning when cond >= 2 and RS >= 10\nclassify_signal() returns Chronic when cond <= 1 and RS >= 10\nclassify_signal() raises ValueError when RS is None\n_RS_BUY_MIN is 85.0\nSIGNAL_ORDER == [Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic]\nscreener.py and indicators.py are unmodified (verify with git diff)",
+          "patterns_to_follow": "Preserve the existing function signature of classify_signal() exactly\nReturn tier label strings with exact casing: Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic",
+          "pitfalls": [
+            "Step 5 (Neutral) catches cond >= 4 with RS < 50 — this includes cond=6-7 with RS < 50. Do not add an upper bound on cond for step 5.",
+            "The evaluation order matters: step 4 (Recovered) must come before step 5 (Neutral) so RS >= 50 stocks with cond 4-5 get Recovered, not Neutral."
+          ],
+          "dependencies": [0],
+          "key_files": [
+            {"file_path": "classifier.py", "note": "Update _RS_BUY_MIN, SIGNAL_ORDER, and classify_signal() body", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Trace cond=6, RS=40 through new evaluation: step 3 fails (RS<50), step 4 fails (RS<50), step 5 fires (cond>=4) → Neutral", "expected_result": "Returns Neutral", "position": 0},
+            {"step_type": "manual", "step_text": "Trace cond=8, RS=84 through new evaluation: step 2 fails (RS<85), step 3 fires (cond>=6 RS>=50) → Bullish", "expected_result": "Returns Bullish", "position": 1},
+            {"step_type": "command", "step_text": "git diff screener.py indicators.py", "expected_result": "Empty diff — no changes to screener.py or indicators.py", "position": 2}
+          ],
+          "testing_strategy": {
+            "unit_tests": [
+              "cond=8 rs=85 → Buy",
+              "cond=8 rs=84 → Bullish",
+              "cond=8 rs=70 → Bullish",
+              "cond=6 rs=50 → Bullish",
+              "cond=6 rs=40 → Neutral",
+              "cond=4 rs=50 → Recovered",
+              "cond=5 rs=50 → Recovered",
+              "cond=4 rs=49 → Neutral",
+              "cond=7 rs=49 → Neutral",
+              "cond=3 rs=10 → Warning",
+              "cond=2 rs=10 → Warning",
+              "cond=1 rs=10 → Chronic",
+              "cond=0 rs=10 → Chronic",
+              "cond=8 rs=9 → Sell-Panic",
+              "cond=0 rs=9 → Sell-Panic",
+              "rs=None → ValueError"
+            ],
+            "integration_tests": [],
+            "manual_tests": [],
+            "edge_cases": [
+              "cond=2 rs=9 → Sell-Panic (RS override fires before Warning check)",
+              "cond=5 rs=50 → Recovered (not Neutral, RS>=50 gates Recovered)"
+            ],
+            "coverage_target": "All 7 return paths covered"
+          }
+        },
+        {
+          "title": "Update SIGNAL_ORDER, colour mapping, and all tier-label call sites in app.py",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Using the call-site list from task 0, update app.py atomically: replace SIGNAL_ORDER with the 7-tier list (import from classifier.py), add colour entries for Recovered (teal/cyan), Warning (orange), Chronic (dark grey/white), remove or update the Bearish entry, update any Buy-filter conditionals and sound-alert conditionals that string-match old tier names. All changes in one commit.",
+          "why": "The Assumptions section requires atomic update of all call sites. A partial update silently breaks colour mapping for stocks the classifier now labels Warning, Recovered, or Chronic — they render with no background colour, not an error.",
+          "what": "In app.py: (1) Update SIGNAL_ORDER reference or import from classifier.py. (2) In _SIGNAL_COLOURS dict add Recovered (teal bg, dark text), Warning (orange bg, dark text), Chronic (dark grey bg, white text); remove Bearish key. (3) Update all conditionals and comparisons from old tier names to new ones. (4) Remove all remaining string literals referencing Bearish.",
+          "where_context": "app.py — all locations from the task 0 audit",
+          "acceptance_criteria": "SIGNAL_ORDER in app.py or imported from classifier equals [Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic]\n_SIGNAL_COLOURS has keys for all 7 tiers\nNo string literal Bearish remains in app.py\nBuy-filter and sound-alert conditionals reference only new tier names\nApp launches without errors with a real depot scan",
+          "patterns_to_follow": "Colour conventions: Buy=#198754/white, Bullish=light green/dark, Recovered=teal (#20c997 or similar)/dark, Neutral=grey-yellow/dark, Warning=orange (#fd7e14 or similar)/dark, Chronic=dark grey (#6c757d or similar)/white, Sell-Panic=#dc3545/white\nKeep the existing _signal_colour() function pattern — just extend the dict",
+          "pitfalls": [
+            "A colour mapping dict silently returns empty string for missing keys — a stock labelled Warning with no colour entry renders with no background, not an error. Verify all 7 keys are present.",
+            "Check for Bearish references in f-strings and multi-line expressions, not only in the colour dict."
+          ],
+          "dependencies": [1],
+          "key_files": [
+            {"file_path": "app.py", "note": "SIGNAL_ORDER, _SIGNAL_COLOURS, Buy filters, sound alerts — all tier-label call sites", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "command", "step_text": "grep -n 'Bearish' app.py", "expected_result": "No matches — zero occurrences of Bearish", "position": 0},
+            {"step_type": "manual", "step_text": "Confirm _SIGNAL_COLOURS dict in app.py has exactly 7 keys matching the new tier names", "expected_result": "All 7 tier names present as colour mapping keys", "position": 1},
+            {"step_type": "manual", "step_text": "Confirm SIGNAL_ORDER equals [Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic]", "expected_result": "List matches spec order exactly", "position": 2},
+            {"step_type": "manual", "step_text": "Launch Streamlit app and scan depot — confirm all 7 tier labels render with correct background colours", "expected_result": "No tier label shows with default/missing background", "position": 3}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "Warning stock shows orange background in UI",
+              "Recovered stock shows teal background in UI",
+              "Chronic stock shows dark grey background with white text in UI",
+              "Stock with RS 70-84 and 8 conditions appears as Bullish not Buy"
+            ],
+            "edge_cases": [
+              "Stock classified as Chronic (0-1 cond, RS>=10) renders correctly with white text on dark background"
+            ],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Update tests to cover all 7 tiers and the RS=85 Buy threshold",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Update tests/test_classifier.py: (1) Replace all assertions referencing Bearish with Warning or Chronic as appropriate, (2) update TestSignalOrder to expect 7 entries, (3) update TestBuyTier assertions for the new RS=85 threshold (cond=8 RS=70 now returns Bullish not Buy), (4) add new test classes TestRecoveredTier, TestWarningTier, TestChronicTier covering all new paths and edge cases from the Sketch section. All existing tests must remain green — update assertions, do not delete tests.",
+          "why": "The Constraints section requires all existing tests to remain green. Without updating tier-name strings in existing assertions, tests for Bearish will fail against the new Warning/Chronic outputs. Without new tests for Recovered/Warning/Chronic, the 7-tier logic has no automated coverage.",
+          "what": "Edit tests/test_classifier.py: update SIGNAL_ORDER assertion to 7 entries, update Buy tier tests to use RS=85 threshold, update former Bearish tests to reference Warning, add TestRecoveredTier, TestWarningTier, TestChronicTier classes with boundary tests and worked edge cases.",
+          "where_context": "tests/test_classifier.py",
+          "acceptance_criteria": "SIGNAL_ORDER test expects [Buy, Bullish, Recovered, Neutral, Warning, Chronic, Sell-Panic]\nTestBuyTier updated: cond=8 RS=85 Buy, cond=8 RS=84 Bullish, cond=8 RS=70 Bullish\nFormer Bearish test cases updated to Warning or Chronic\nNew TestRecoveredTier: cond=4 RS=50 Recovered, cond=5 RS=50 Recovered, cond=4 RS=49 Neutral\nNew TestWarningTier: cond=3 RS=10 Warning, cond=2 RS=10 Warning, cond=3 RS=50 Warning\nNew TestChronicTier: cond=1 RS=10 Chronic, cond=0 RS=10 Chronic\nEdge cases: cond=6 RS=40 Neutral, cond=7 RS=49 Neutral, cond=2 RS=9 Sell-Panic\nAll tests pass: python -m pytest tests/ -v shows zero failures",
+          "patterns_to_follow": "Mirror existing class structure (TestBuyTier, TestBullishTier, etc.) for new tier classes\nUse the existing _row(n_true, rs) helper to build test rows\nDo not delete existing test methods — update their expected values",
+          "pitfalls": [
+            "TestBuyTier has tests for cond=8 RS=70 and RS=69 — both now return Bullish, not Buy. Update both assertions.",
+            "If test_classifier.py imports SIGNAL_ORDER, the length assertion changes from 5 to 7 — update test_length() and test_exact_content_and_order() both."
+          ],
+          "dependencies": [1],
+          "key_files": [
+            {"file_path": "tests/test_classifier.py", "note": "Update all tier-name assertions and add new test classes for Recovered, Warning, Chronic", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "command", "step_text": "python -m pytest tests/ -v", "expected_result": "All tests pass, zero failures, zero errors", "position": 0},
+            {"step_type": "command", "step_text": "python -m pytest tests/ -v 2>&1 | grep -E 'Recovered|Warning|Chronic'", "expected_result": "Test names referencing all three new tiers appear in output", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [
+              "All 7 tier return paths have at least one test each",
+              "RS=None raises ValueError",
+              "RS boundary: RS=9 Sell-Panic, RS=10 not Sell-Panic",
+              "Buy boundary: RS=85 Buy, RS=84 Bullish",
+              "Recovered boundary: cond=4 RS=50 Recovered, cond=4 RS=49 Neutral",
+              "Bullish vs Neutral edge case: cond=6 RS=40 Neutral"
+            ],
+            "integration_tests": [],
+            "manual_tests": [],
+            "edge_cases": [
+              "cond=7 RS=49 Neutral (high cond count but weak RS)",
+              "cond=2 RS=9 Sell-Panic (RS override fires before Warning check)",
+              "cond=5 RS=50 Recovered (not Neutral)"
+            ],
+            "coverage_target": "All 7 return paths covered by at least one explicit test"
+          }
+        },
+        {
+          "title": "Smoke-test 7-tier output on live dataset and verify Success Metrics",
+          "type": "work",
+          "complexity": "small",
+          "priority": "medium",
+          "needs_review": false,
+          "description": "Run the updated screener against the depot and manually verify the two leading-indicator Success Metrics: (1) at least one stock appears in Warning that would have shown Neutral or Bearish under the old 5-tier system on the same scan data, and (2) at least one stock that was Buy under the old system (RS 70-84, 8 conditions) now appears as Bullish. If no natural Warning candidates exist in the depot, construct a synthetic test row (cond=3, RS=30) to verify the label directly.",
+          "why": "Unit tests verify the classifier logic, but only a live scan confirms the integration with screener.py, the Streamlit UI colour rendering, and the absence of runtime errors across the full pipeline.",
+          "what": "Launch the Streamlit app with the existing depot CSV. Identify one Warning stock and one reclassified Bullish stock. Verify both old and new tier labels for the same row. Confirm all 7 tier colours render without missing backgrounds or Python exceptions.",
+          "where_context": "app.py (Streamlit launch), depot/ (CSV input), screener.py (run pipeline)",
+          "acceptance_criteria": "At least one stock in scan output shows tier Warning with orange background\nFor that Warning stock: cond is 2 or 3, RS >= 10, and old 5-tier logic (cond>=2) would have returned Bearish\nAt least one stock shows Bullish with RS 70-84 and cond=8, confirming RS=85 Buy floor is active\nStreamlit app renders all 7 tier colours without errors or missing backgrounds\nNo Python exceptions in the terminal during the scan",
+          "patterns_to_follow": "Use existing depot CSV — no new data sources beyond yfinance already used per scan\nSimulate old 5-tier check inline: cond==8 and RS>=70 was Buy, cond>=2 was Bearish",
+          "pitfalls": [
+            "If the depot has no stocks with 2-3 SEPA conditions, Warning will not appear naturally — construct a synthetic row and call classify_signal() directly to verify the label.",
+            "The old Buy threshold was RS>=70 — when spot-checking reclassified stocks, compare against RS in range 70-84 with cond=8."
+          ],
+          "dependencies": [2, 3],
+          "key_files": [
+            {"file_path": "app.py", "note": "Launch point for Streamlit smoke test", "position": 0},
+            {"file_path": "depot/", "note": "Existing depot CSV data for live scan", "position": 1}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Launch Streamlit app and scan the depot — confirm at least one Warning tier row with orange background", "expected_result": "At least one Warning stock visible", "position": 0},
+            {"step_type": "manual", "step_text": "For the Warning stock: confirm cond is 2 or 3, RS >= 10, and old Bearish threshold (cond>=2) would have returned Bearish", "expected_result": "Old system returned Bearish or Neutral, new system returns Warning — 1-2 tier earlier signal confirmed", "position": 1},
+            {"step_type": "manual", "step_text": "Find a stock with cond=8 and RS in range 70-84 — confirm it shows Bullish not Buy", "expected_result": "Bullish tier shown, RS=85 Buy floor confirmed active", "position": 2},
+            {"step_type": "manual", "step_text": "Check terminal for Python exceptions during the scan", "expected_result": "Clean scan, no stack traces", "position": 3}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "Full depot scan with all 7 tiers rendering correctly",
+              "Spot-check Warning tier against old 5-tier logic",
+              "Spot-check Bullish reclassification for RS 70-84 stocks with 8 conditions"
+            ],
+            "edge_cases": [
+              "If no Warning candidates in depot, inject synthetic row (cond=3, RS=30) to verify label"
+            ],
+            "coverage_target": ""
+          }
+        }
+      ]
+    }
+  ]
+}
