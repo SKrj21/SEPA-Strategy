@@ -1,0 +1,248 @@
+{
+  "source_spec": "docs/ideation/2026-05-19T072510-stock-signal-classification-5-categories-with-score-requirements.md",
+  "source_spec_sha256": "5ed0d8b590ba1330a91cdff1736f537c811e7f5cfa3a07fb17e8d0001d68a29d",
+  "decomposition_notes": "Single-goal shape — all work lives in one coherent display-layer seam. The constraint 'screener.py and indicators.py must not be modified' means the entire implementation is a new classifier module plus targeted changes in app.py. There is no schema/migration boundary, no second layer that could independently ship. Task order: (1) build and test the classifier module, (2) wire it into app.py's data pipeline, (3) replace display columns and colour coding, (4) update the Overview tab summary. Each task is independently reviewable but they must land in order because later tasks import or build on earlier ones.",
+  "goals": [
+    {
+      "title": "Add 5-category Signal classification with Score column to screener results",
+      "type": "goal",
+      "complexity": "medium",
+      "priority": "high",
+      "needs_review": false,
+      "why": "The current binary SEPA Pass / Fail column makes it impossible to triage results at a glance — a stock meeting 7 of 8 conditions looks identical to one meeting 0. Users must scan every condition column manually to find actionable candidates. The 5-tier classification (Buy / Bullish / Neutral / Bearish / Sell-Panic) plus an RS Rating Score column surfaces buy candidates and exit signals without any manual sorting, directly addressing the problem statement.",
+      "what": "Create a new classifier.py module that maps each screener result row to one of five Signal tiers using the documented threshold logic. Wire the classifier into app.py so Signal and Score columns replace the boolean SEPA Pass column. Apply colour coding to Signal cells, sort results by Score descending by default, and update the Overview tab to show a category-count summary row.",
+      "where_context": "classifier.py (new), tests/test_classifier.py (new), app.py (Section 3 pipeline, Section 4 Results display — Overview tab and per-depot tabs)",
+      "acceptance_criteria": "classifier.py exposes a classify_signal(row: dict) -> str function implementing the documented tier logic in order: RS None excluded, RS < 10 Sell-Panic override, then 8/8+RS>=70 Buy, 6-7+RS>=50 Bullish, 4-5 Neutral, 2-3 Bearish, <=1 Sell-Panic\nThe 8 conditions counted are exactly: Above SMA50, Above SMA150, Above SMA200, SMA50>SMA150, SMA50>SMA200, SMA200 Uptrend, Near 52W High, Above 52W Low — not Volume Surge, Breakout, or SEPA Pass\nscreener.py and indicators.py are not modified\nExisting 160 tests remain green\ntests/test_classifier.py covers all tier boundaries, the RS<10 override, the RS=None exclusion path, and edge cases (exactly 1, 4, 6, 8 conditions met)\nResults table shows Signal and Score columns; SEPA Pass boolean column is removed\nSignal cells are colour-coded: Buy=green, Bullish=light green, Neutral=grey/yellow, Bearish=light red, Sell-Panic=red\nResults are sorted by Score (RS Rating) descending by default in every depot tab and the Overview all-results view\nOverview tab shows a category-count summary (e.g. '3 Buy / 7 Bullish / 12 Neutral / 2 Bearish / 1 Sell-Panic')\nThe per-depot Buy Signals sub-tab shows only rows where Signal == 'Buy'\nThe Overview Buy Signals section shows only rows where Signal == 'Buy'",
+      "pitfalls": [
+        "Do not count Volume Surge, Breakout, or SEPA Pass toward the conditions count — only the 8 named trend-template fields",
+        "The RS < 10 override fires regardless of conditions count — evaluate it before the conditions gate",
+        "RS Rating is a float that may be None; always guard against None before numeric comparison",
+        "The _colour() function in app.py currently handles booleans — it must not be applied to the new Signal column; a separate signal colour function is required",
+        "Do not remove the condition boolean columns (Above SMA50, etc.) from the dataframe — only remove the SEPA Pass column from the displayed output",
+        "_BOOL_COLS list in app.py includes 'SEPA Pass'; remove it from that list or the styler will error on a missing column",
+        "Rows where RS Rating is None are already excluded by run_full_screen (fewer than 64 days); classify_signal should still handle the None case defensively and raise or return a sentinel rather than silently misclassifying"
+      ],
+      "tasks": [
+        {
+          "title": "Create classifier.py module with classify_signal function and tier logic",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Create classifier.py at the project root. Implement classify_signal(row: dict) -> str that accepts a screener result row dict and returns one of the five tier strings. Evaluation order matches the spec: (1) RS Rating is None → raise ValueError or return a sentinel (document the choice); (2) RS < 10 → 'Sell-Panic'; (3) count True values across exactly the 8 named condition keys; (4) apply tier thresholds. Also expose SIGNAL_ORDER = ['Buy', 'Bullish', 'Neutral', 'Bearish', 'Sell-Panic'] for use by the display layer.",
+          "why": "All downstream tasks depend on a tested, importable classify_signal function. Isolating it in classifier.py satisfies the constraint that screener.py is not modified.",
+          "what": "New classifier.py module with classify_signal(row) and SIGNAL_ORDER constant. No imports from app.py. No Streamlit dependency.",
+          "where_context": "classifier.py (new file at project root, same level as screener.py and app.py)",
+          "acceptance_criteria": "classifier.py exists and is importable with no Streamlit or app.py dependency\nclassify_signal returns 'Buy' when all 8 conditions are True and RS Rating >= 70\nclassify_signal returns 'Bullish' when 6 or 7 conditions are True and RS Rating >= 50\nclassify_signal returns 'Neutral' when exactly 4 or 5 conditions are True\nclassify_signal returns 'Bearish' when exactly 2 or 3 conditions are True\nclassify_signal returns 'Sell-Panic' when 0 or 1 conditions are True\nclassify_signal returns 'Sell-Panic' when RS Rating < 10 regardless of conditions count\nclassify_signal handles RS Rating = None defensively (raises ValueError or returns a documented sentinel — not a silent misclassification)\nSIGNAL_ORDER = ['Buy', 'Bullish', 'Neutral', 'Bearish', 'Sell-Panic'] is exported\nOnly the 8 condition keys are counted: 'Above SMA50', 'Above SMA150', 'Above SMA200', 'SMA50>SMA150', 'SMA50>SMA200', 'SMA200 Uptrend', 'Near 52W High', 'Above 52W Low'",
+          "patterns_to_follow": "Follow the pure-function style of check_trend_template in screener.py — no side effects, no global state\nUse a module-level tuple or list for CONDITION_KEYS so the 8 keys are defined in one place and not repeated in tests",
+          "pitfalls": [
+            "Do not import from screener.py or app.py — classifier.py must be a leaf module with no internal circular dependencies",
+            "Condition values in the row dict may be None (indicator not available), not just True/False — only count True, not non-False"
+          ],
+          "dependencies": [],
+          "key_files": [
+            {"file_path": "classifier.py", "note": "New module — the entire implementation lives here", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Open a Python REPL at the project root and run: from classifier import classify_signal, SIGNAL_ORDER; print(SIGNAL_ORDER)", "expected_result": "Prints ['Buy', 'Bullish', 'Neutral', 'Bearish', 'Sell-Panic'] with no import errors", "position": 0},
+            {"step_type": "manual", "step_text": "In the same REPL, call classify_signal({'Above SMA50': True, 'Above SMA150': True, 'Above SMA200': True, 'SMA50>SMA150': True, 'SMA50>SMA200': True, 'SMA200 Uptrend': True, 'Near 52W High': True, 'Above 52W Low': True, 'RS Rating': 82.0}) and verify it returns 'Buy'", "expected_result": "Returns the string 'Buy'", "position": 1},
+            {"step_type": "manual", "step_text": "Call classify_signal with RS Rating = 5.0 and all 8 conditions True; verify it returns 'Sell-Panic' (RS override fires before conditions gate)", "expected_result": "Returns the string 'Sell-Panic'", "position": 2}
+          ],
+          "testing_strategy": {
+            "unit_tests": [
+              "All 8 conditions True + RS >= 70 → Buy",
+              "7 conditions True + RS >= 50 → Bullish",
+              "6 conditions True + RS >= 50 → Bullish",
+              "6 conditions True + RS < 50 → Neutral (count 4-5 gate applies)",
+              "5 conditions True → Neutral",
+              "4 conditions True → Neutral",
+              "3 conditions True → Bearish",
+              "2 conditions True → Bearish",
+              "1 condition True → Sell-Panic",
+              "0 conditions True → Sell-Panic",
+              "RS < 10 with 8 conditions True → Sell-Panic (override)",
+              "RS = 9.9 boundary → Sell-Panic",
+              "RS = 10.0 boundary → not Sell-Panic via RS override",
+              "RS = None → ValueError or sentinel (not a valid tier string)",
+              "Condition value is None (not True) → not counted as True",
+              "Condition value is False → not counted as True"
+            ],
+            "integration_tests": [],
+            "manual_tests": ["REPL smoke test of Buy and Sell-Panic override cases"],
+            "edge_cases": [
+              "Exactly 8 conditions True but RS = 69 → Bullish (not Buy, RS gate fails)",
+              "Exactly 6 conditions True but RS = 49 → Neutral (not Bullish, RS gate fails)",
+              "RS = 10.0 with 0 conditions → Sell-Panic via conditions gate not RS override"
+            ],
+            "coverage_target": "100% branch coverage of classify_signal"
+          }
+        },
+        {
+          "title": "Write tests/test_classifier.py covering all tier boundaries and edge cases",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Create tests/test_classifier.py. Use pytest. Build a helper that produces a full row dict with all 8 condition keys set to True and a configurable RS Rating, then override individual fields per test. Cover every tier boundary, the RS < 10 override, the RS = None path, None condition values, and the SIGNAL_ORDER export.",
+          "why": "The constraints doc explicitly requires new classification logic to be covered by its own unit tests and that the existing 160 tests remain green. This task delivers that coverage before app.py is touched, so a regression in the classifier is caught before the UI wires up.",
+          "what": "New test file at tests/test_classifier.py. Does not modify any existing test file. All tests must pass alongside the existing 160.",
+          "where_context": "tests/test_classifier.py (new file)",
+          "acceptance_criteria": "tests/test_classifier.py exists and all tests pass\nTests cover: Buy tier (all conditions + RS >= 70), Bullish tier (6 and 7 conditions + RS >= 50), Neutral tier (4 and 5 conditions), Bearish tier (2 and 3 conditions), Sell-Panic via conditions (0 and 1), Sell-Panic via RS override (RS < 10), RS = 10.0 boundary (not override), RS = None path, None condition value not counted, all 8 condition keys are the correct named keys\nExisting 160 tests continue to pass (no modifications to existing test files)\nSIGNAL_ORDER import is tested",
+          "patterns_to_follow": "Mirror the helper pattern in tests/test_screener.py (_with(**overrides) building on a PASSING base dict)\nUse descriptive test method names that encode the scenario, not just 'test_1'",
+          "pitfalls": [
+            "Do not import from screener.py in this test file — test classifier.py in isolation",
+            "Ensure the base fixture dict includes all 8 condition keys plus RS Rating so individual overrides produce deterministic tier results"
+          ],
+          "dependencies": [0],
+          "key_files": [
+            {"file_path": "tests/test_classifier.py", "note": "New test file — all classifier unit tests", "position": 0},
+            {"file_path": "classifier.py", "note": "Module under test", "position": 1}
+          ],
+          "verification_steps": [
+            {"step_type": "command", "step_text": "python -m pytest tests/test_classifier.py -v", "expected_result": "All tests in test_classifier.py pass; zero failures", "position": 0},
+            {"step_type": "command", "step_text": "python -m pytest tests/ -v", "expected_result": "All tests pass, total count is original 160 plus new classifier tests; zero failures", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [
+              "One test class per tier covering both boundary counts",
+              "Dedicated class for RS override and RS None path",
+              "Test that SIGNAL_ORDER contains exactly the five expected strings in order"
+            ],
+            "integration_tests": [],
+            "manual_tests": [],
+            "edge_cases": [
+              "8 conditions True but RS = 69 → not Buy",
+              "6 conditions True but RS = 49 → not Bullish",
+              "RS = 9.9 → Sell-Panic; RS = 10.0 → not Sell-Panic via override"
+            ],
+            "coverage_target": "All branches of classify_signal exercised"
+          }
+        },
+        {
+          "title": "Wire classify_signal into app.py screening pipeline and attach Signal and Score to each result row",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "In app.py, import classify_signal from classifier. After run_full_screen returns results, iterate each row and attach two new keys: 'Signal' (the tier string from classify_signal) and 'Score' (a copy of 'RS Rating', kept as a float). Rows where RS Rating is None are already excluded by run_full_screen, so no None-guard is needed on the loop body, but add a defensive check anyway. The 'SEPA Pass' key remains in the dict for backwards compatibility but will be hidden from display in the next task.",
+          "why": "The display layer needs Signal and Score present on every row before it can render or sort them. Attaching them in the pipeline step (right after screening) keeps the enrichment in one place and makes the per-depot and overview tabs automatically receive the enriched rows.",
+          "what": "Add import of classify_signal at top of app.py. In the Section 3 loop over depot_results, after results are collected, add a second pass that mutates each row dict adding 'Signal' and 'Score'. Alternatively, enrich inside the existing loop immediately after run_full_screen returns.",
+          "where_context": "app.py — top-level import block and Section 3 Screening loop",
+          "acceptance_criteria": "classify_signal is imported from classifier at the top of app.py\nEvery row dict in every depot's results list contains a 'Signal' key (one of the five tier strings) and a 'Score' key (float equal to RS Rating)\nThe 'SEPA Pass' key is still present in the dict (not deleted in this task)\nThe app starts without errors when run via streamlit run app.py",
+          "patterns_to_follow": "Enrich rows in the same loop that calls run_full_screen, immediately after results are returned, so enrichment is co-located with screening rather than scattered across tabs",
+          "pitfalls": [
+            "Do not call classify_signal inside individual tab render blocks — enrich once in the pipeline, consume everywhere",
+            "If RS Rating is None on a row that somehow survived exclusion, catch the error from classify_signal and assign Signal = 'Sell-Panic' as a safe fallback rather than crashing the whole app"
+          ],
+          "dependencies": [0],
+          "key_files": [
+            {"file_path": "app.py", "note": "Import block (top) and Section 3 screening loop to be modified", "position": 0},
+            {"file_path": "classifier.py", "note": "Module being imported", "position": 1}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run streamlit run app.py and confirm the app loads without an ImportError or AttributeError in the terminal", "expected_result": "App starts and the Streamlit UI opens in the browser with no error banner", "position": 0},
+            {"step_type": "manual", "step_text": "Add a temporary st.write(depot_results[0][0][0]) debug line after enrichment and reload — confirm the first result row dict contains 'Signal' and 'Score' keys, then remove the debug line", "expected_result": "Row dict printed in UI includes 'Signal': one of the five tier strings and 'Score': a float", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "App starts without errors",
+              "First result row contains Signal and Score keys after screening"
+            ],
+            "edge_cases": [
+              "Depot with zero results should not crash the enrichment loop"
+            ],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Replace SEPA Pass column with Signal and Score columns in per-depot display tables and apply colour coding",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Update the display layer in app.py to (a) remove 'SEPA Pass' from _BOOL_COLS so the boolean styler does not error on a missing column, (b) add a _signal_colour(val) function that returns the correct background/text CSS for each tier string, (c) update _styled() or add a new helper that applies _signal_colour to the 'Signal' column and excludes 'SEPA Pass' from the dataframe before display, (d) sort all result dataframes by 'Score' descending before passing to st.dataframe. Update the per-depot Buy Signals sub-tab to filter on Signal == 'Buy' instead of SEPA Pass is True. Update the per-depot KPI metric 'Buy signals' count accordingly.",
+          "why": "This is the user-visible outcome of the entire feature: the table now shows Signal and Score instead of the boolean pass/fail, with colour coding that lets users triage at a glance.",
+          "what": "Modify _BOOL_COLS, add _signal_colour(), update _styled() or create a parallel helper, update sort calls, update Buy Signals filter, update buy_count in per-depot KPI row.",
+          "where_context": "app.py — _BOOL_COLS list, _colour and _styled helpers, per-depot tabs loop (sub_buy and sub_all sub-tabs)",
+          "acceptance_criteria": "'SEPA Pass' is removed from _BOOL_COLS\nA _signal_colour(val) function exists mapping: 'Buy' → green, 'Bullish' → light green, 'Neutral' → grey/yellow, 'Bearish' → light red, 'Sell-Panic' → red\nThe 'Signal' column in displayed dataframes is styled with _signal_colour\nThe 'SEPA Pass' column is not shown in any st.dataframe call (drop it before display, not from the row dict)\nAll result dataframes are sorted by 'Score' descending before display\nThe per-depot Buy Signals sub-tab shows rows where Signal == 'Buy'\nThe per-depot 'Buy signals' KPI metric reflects the count of rows where Signal == 'Buy'\nThe app renders without errors on a real or mocked dataset",
+          "patterns_to_follow": "Use the same (getattr(styler, 'map', None) or styler.applymap) pattern already in _styled() to maintain Streamlit version compatibility\nDrop 'SEPA Pass' from the display dataframe with df.drop(columns=['SEPA Pass'], errors='ignore') rather than restructuring the row dicts",
+          "pitfalls": [
+            "The Pandas Styler subset parameter requires the column to exist in the dataframe — drop 'SEPA Pass' before creating the styler, not after",
+            "Do not remove the 'SEPA Pass' key from the row dicts themselves — the download CSV path may still reference it and removing it would be a silent data change",
+            "Sort must happen before styling, not after — Styler objects cannot be re-sorted"
+          ],
+          "dependencies": [2],
+          "key_files": [
+            {"file_path": "app.py", "note": "All display-layer changes: _BOOL_COLS, colour helpers, per-depot tab rendering loop", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run the app and open any depot tab. Confirm the results table shows a 'Signal' column with colour-coded cells and a 'Score' column, and that 'SEPA Pass' is not visible", "expected_result": "Signal column present with coloured cells; SEPA Pass column absent; Score column shows numeric RS Rating values", "position": 0},
+            {"step_type": "manual", "step_text": "Open the Buy Signals sub-tab for any depot and confirm only rows with Signal = 'Buy' are listed", "expected_result": "All rows in the Buy Signals sub-tab show 'Buy' in the Signal column", "position": 1},
+            {"step_type": "manual", "step_text": "Check that rows in the All Results sub-tab are ordered by Score descending (highest Score at the top)", "expected_result": "First row has the highest Score value; descending order is maintained throughout", "position": 2},
+            {"step_type": "manual", "step_text": "Open the browser dev console and confirm no Python traceback appears in the Streamlit terminal when rendering the depot tabs", "expected_result": "Terminal shows no KeyError, AttributeError, or Styler-related exception", "position": 3}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "Signal column visible and colour-coded in depot results table",
+              "SEPA Pass column not visible in any table",
+              "Buy Signals sub-tab filters on Signal == Buy",
+              "All Results sub-tab sorted by Score descending"
+            ],
+            "edge_cases": [
+              "Depot with no Buy signals — Buy Signals sub-tab shows existing 'No buy signals for this depot' message",
+              "Depot with all Sell-Panic signals — Score sort still works correctly"
+            ],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Update Overview tab to use Signal-based filtering, category-count summary, and Score sort",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Update the Overview tab in app.py to (a) replace the SEPA Pass is True filter with Signal == 'Buy' for the all_buy_signals list, (b) add a category-count summary display showing how many stocks are in each tier across all depots, (c) sort all_buy_signals and all_results_flat by Score descending, (d) update the 'Buy signals' KPI metric to count rows where Signal == 'Buy', (e) update the sound-alert logic to use Signal == 'Buy' count, (f) apply the same Signal column colour coding and SEPA Pass column hiding used in the per-depot tabs.",
+          "why": "The Overview tab is the first thing users see and is explicitly called out in the Outcome section: it must show the category-count summary and Buy-sorted results without manual effort.",
+          "what": "Modify the Overview tab block in app.py. Reuse _signal_colour and SIGNAL_ORDER from classifier.py.",
+          "where_context": "app.py — Overview tab block",
+          "acceptance_criteria": "all_buy_signals filters on Signal == 'Buy' (not SEPA Pass is True)\nOverview KPI 'Buy signals' metric reflects Signal == 'Buy' count\nSound alert triggers when Signal == 'Buy' count increases between scans\nA category-count summary line is displayed showing counts for all 5 tiers\nThe summary correctly shows 0 for any tier with no members\nOverview Buy Signals table is sorted by Score descending\nOverview All Results table is sorted by Score descending\nSEPA Pass column is not shown in any Overview table\nSignal column is colour-coded in Overview tables",
+          "patterns_to_follow": "Use SIGNAL_ORDER from classifier.py to iterate tiers in the summary so the order is always Buy → Bullish → Neutral → Bearish → Sell-Panic\nBuild the summary string with a list comprehension over SIGNAL_ORDER to avoid hardcoding tier names in app.py",
+          "pitfalls": [
+            "The screen_prev_buy_count session state key must compare Signal=='Buy' count, not SEPA Pass count, or the sound alert will fire incorrectly after the column is replaced",
+            "The category-count summary should handle the case where all_results_flat is empty without a KeyError"
+          ],
+          "dependencies": [3],
+          "key_files": [
+            {"file_path": "app.py", "note": "Overview tab block to be updated; also imports SIGNAL_ORDER from classifier", "position": 0},
+            {"file_path": "classifier.py", "note": "SIGNAL_ORDER consumed here for summary iteration", "position": 1}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run the app and open the Overview tab. Confirm a category-count summary line appears showing counts for all 5 tiers", "expected_result": "Summary line is visible and accounts for all screened stocks across all depots", "position": 0},
+            {"step_type": "manual", "step_text": "Confirm the Overview 'Buy signals' metric matches the count of Buy rows in the Buy Signals table below it", "expected_result": "Metric number equals the row count in the Buy Signals table", "position": 1},
+            {"step_type": "manual", "step_text": "Confirm the Buy Signals table shows only Signal == 'Buy' rows, sorted by Score descending", "expected_result": "All visible rows have Signal = 'Buy'; highest Score is in the first row", "position": 2},
+            {"step_type": "manual", "step_text": "Confirm 'SEPA Pass' column is absent from all tables in the Overview tab", "expected_result": "No column labelled 'SEPA Pass' is visible anywhere in the Overview tab", "position": 3}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "Category-count summary visible in Overview tab",
+              "Overview Buy Signals filtered to Signal == Buy",
+              "Overview KPI matches Buy table row count",
+              "Sound alert session state updated to use Signal == Buy count"
+            ],
+            "edge_cases": [
+              "All stocks are Sell-Panic — Buy Signals section shows 'No buy signals found across all depots'",
+              "Zero depots loaded — summary shows all zeros without crashing"
+            ],
+            "coverage_target": ""
+          }
+        }
+      ]
+    }
+  ]
+}
