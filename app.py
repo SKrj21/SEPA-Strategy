@@ -7,8 +7,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from charts import build_detail_chart
-from csv_loader import discover_csv_files, load_csv_file
-from data_fetcher import fetch_ohlcv, fetch_spy_benchmark
+from csv_loader import discover_csv_files, load_csv_file, load_csv_name_map
+from data_fetcher import fetch_ohlcv, fetch_spy_benchmark, fetch_ticker_names
 from indicators import compute_indicators
 from isin_resolver import resolve_isin
 from classifier import classify_signal
@@ -85,7 +85,7 @@ with st.sidebar:
         if refresh_mins > 0:
             st_autorefresh(interval=int(refresh_mins * 60_000), key="autorefresh_ticker")
 
-    if st.button("🔄 Re-scan", use_container_width=True):
+    if st.button("🔄 Re-scan", width='stretch'):
         for k in [k for k in st.session_state if k.startswith(("auto_load_", "depot_", "screen_"))]:
             st.session_state.pop(k, None)
         st.rerun()
@@ -118,6 +118,26 @@ def _entries_from_depot_def(depot_def: dict) -> list[str]:
         except Exception as exc:
             st.warning(f"Could not load {fname}: {exc}")
     return list(dict.fromkeys(e.strip().upper() for e in entries if e.strip()))
+
+
+def _names_from_depot_def(depot_def: dict) -> dict[str, str]:
+    """Build {isin_or_ticker: display_name} from all files in a depot definition."""
+    name_map: dict[str, str] = {}
+    for fname in depot_def.get("files", []):
+        name_map.update(load_csv_name_map(APP_DIR / fname))
+    return name_map
+
+
+def _build_ticker_to_name(isin_map: dict[str, str], raw_tickers: list[str], isin_name_map: dict[str, str]) -> dict[str, str]:
+    """Map resolved tickers → display names using the per-file ISIN→name map."""
+    ticker_to_name: dict[str, str] = {}
+    for isin, ticker in isin_map.items():
+        if isin in isin_name_map:
+            ticker_to_name[ticker] = isin_name_map[isin]
+    for ticker in raw_tickers:
+        if ticker not in ticker_to_name and ticker in isin_name_map:
+            ticker_to_name[ticker] = isin_name_map[ticker]
+    return ticker_to_name
 
 
 def _resolve_entries(depot_name: str, entries: list[str]) -> tuple[list[str], list[str], dict[str, str]]:
@@ -165,8 +185,11 @@ if depot_config:
     for depot_def in depot_config:
         name = depot_def.get("name", "Depot")
         entries = _entries_from_depot_def(depot_def)
+        isin_name_map = _names_from_depot_def(depot_def)
         tickers, failed, isin_map = _resolve_entries(name, entries)
-        depots.append({"name": name, "tickers": tickers, "failed_isins": failed, "isin_map": isin_map})
+        raw_t = [e for e in entries if not (len(e) == 12 and e[:2].isalpha())]
+        ticker_to_name = _build_ticker_to_name(isin_map, raw_t, isin_name_map)
+        depots.append({"name": name, "tickers": tickers, "failed_isins": failed, "isin_map": isin_map, "ticker_to_name": ticker_to_name})
         with st.sidebar:
             st.caption(f"📁 {name}: {len(tickers)} tickers")
 
@@ -230,16 +253,50 @@ else:
         st.session_state["auto_load_failed_isins"] = []
         st.session_state["auto_load_tickers"] = raw_tickers
 
-    depots = [{
-        "name": "All",
-        "tickers": st.session_state["auto_load_tickers"],
-        "failed_isins": st.session_state["auto_load_failed_isins"],
-        "isin_map": st.session_state["auto_load_isin_to_ticker"],
-    }]
+    _resolved_map = st.session_state.get("auto_load_isin_to_ticker", {})
+    if discovered:
+        depots = []
+        for _fname, _fentries in discovered.items():
+            _depot_name = Path(_fname).stem
+            _file_isins, _file_tickers = [], []
+            for _e in _fentries:
+                _e = _e.strip().upper()
+                if len(_e) == 12 and _e[:2].isalpha():
+                    _file_isins.append(_e)
+                else:
+                    _file_tickers.append(_e)
+            _file_resolved = {isin: _resolved_map[isin] for isin in _file_isins if isin in _resolved_map}
+            _file_failed = [isin for isin in _file_isins if isin not in _resolved_map]
+            _tickers = list(dict.fromkeys(list(_file_resolved.values()) + _file_tickers))
+            _isin_name_map = load_csv_name_map(APP_DIR / _fname)
+            _ticker_to_name = _build_ticker_to_name(_file_resolved, _file_tickers, _isin_name_map)
+            depots.append({
+                "name": _depot_name,
+                "tickers": _tickers,
+                "failed_isins": _file_failed,
+                "isin_map": _file_resolved,
+                "ticker_to_name": _ticker_to_name,
+            })
+    else:
+        depots = [{
+            "name": "All",
+            "tickers": st.session_state.get("auto_load_tickers", []),
+            "failed_isins": st.session_state.get("auto_load_failed_isins", []),
+            "isin_map": _resolved_map,
+            "ticker_to_name": {},
+        }]
 
 
 # ── Combined ticker list ───────────────────────────────────────────────────────
 all_tickers: list[str] = list(dict.fromkeys(t for d in depots for t in d["tickers"]))
+
+# ── Global ticker→name map (depot CSV primary, yfinance fallback) ──────────────
+_global_ticker_to_name: dict[str, str] = {}
+for _d in depots:
+    _global_ticker_to_name.update(_d.get("ticker_to_name", {}))
+_missing_names = tuple(t for t in all_tickers if t not in _global_ticker_to_name)
+if _missing_names:
+    _global_ticker_to_name.update(fetch_ticker_names(_missing_names))
 
 
 # ── No data guard ──────────────────────────────────────────────────────────────
@@ -348,12 +405,14 @@ for idx, depot in enumerate(depots):
         )
     else:
         results, excluded = [], []
-    for row in results:
+    for i, row in enumerate(results):
         try:
             row["Signal"] = classify_signal(row)
         except ValueError:
             row["Signal"] = "Sell-Panic"
         row["Score"] = row.get("RS Rating")
+        name = _global_ticker_to_name.get(row.get("Ticker", ""), "")
+        results[i] = {"Ticker": row["Ticker"], "Name": name, **{k: v for k, v in row.items() if k not in ("Ticker", "Name")}}
     depot_results.append((results, excluded))
 _screen_prog.empty()
 st.session_state["scan_completed_at"] = datetime.datetime.now()
@@ -479,7 +538,7 @@ with tabs[0]:
                 styler = apply_fn(lambda v, c=col: _cell_colour(v, c), subset=[col])
             return styler
 
-        st.dataframe(_style_summary(_summary_df), use_container_width=True)
+        st.dataframe(_style_summary(_summary_df), width='stretch')
 
     all_buy_signals = [
         {**r, "Depot": depots[i]["name"]}
@@ -519,7 +578,7 @@ with tabs[0]:
 
     if all_buy_signals:
         st.subheader("Buy Signals (all depots)")
-        st.dataframe(_styled(all_buy_signals), use_container_width=True)
+        st.dataframe(_styled(all_buy_signals), width='stretch')
         buy_dl_df = pd.DataFrame(all_buy_signals).drop(columns=["SEPA Pass"], errors="ignore")
         if "Score" in buy_dl_df.columns:
             buy_dl_df = buy_dl_df.sort_values("Score", ascending=False, na_position="last")
@@ -535,7 +594,7 @@ with tabs[0]:
 
     if all_results_flat:
         with st.expander("All results (all depots)"):
-            st.dataframe(_styled(all_results_flat), use_container_width=True)
+            st.dataframe(_styled(all_results_flat), width='stretch')
             all_dl_df = pd.DataFrame(all_results_flat).drop(columns=["SEPA Pass"], errors="ignore")
             if "Score" in all_dl_df.columns:
                 all_dl_df = all_dl_df.sort_values("Score", ascending=False, na_position="last")
@@ -576,34 +635,48 @@ for i, depot in enumerate(depots):
             st.info("No data available for this depot.")
             continue
 
-        sub_buy, sub_all, sub_chart = st.tabs(["🟢 Buy Signals", "📋 All Results", "📊 Detail Chart"])
+        _TIER_ICONS = {
+            "Buy": "🟢", "Bullish": "📈", "Recovered": "🔵",
+            "Neutral": "🟡", "Warning": "🟠", "Chronic": "⚫", "Sell-Panic": "🔴",
+        }
+        from classifier import SIGNAL_ORDER as _SO_d
+        _tier_tab_labels = ["📋 All Results"] + [f"{_TIER_ICONS.get(t, '')} {t}" for t in _SO_d] + ["📊 Detail Chart"]
+        _all_sub, *_tier_tabs, _chart_sub = st.tabs(_tier_tab_labels)
+        sub_chart = _chart_sub
 
-        with sub_buy:
-            buy_rows = sorted(
-                [r for r in results if r.get("Signal") == "Buy"],
-                key=lambda r: r.get("Score") or 0, reverse=True,
+        with _all_sub:
+            sorted_results = sorted(
+                results,
+                key=lambda r: (_SO_d.index(r["Signal"]) if r.get("Signal") in _SO_d else len(_SO_d),
+                               -(r.get("Score") or 0)),
             )
-            if buy_rows:
-                st.dataframe(_styled(buy_rows), use_container_width=True)
-                st.download_button(
-                    "⬇ Download CSV",
-                    pd.DataFrame(buy_rows).to_csv(index=False).encode("utf-8"),
-                    f"{depot['name']}_buy_signals.csv",
-                    "text/csv",
-                    key=_gk("dl_depot_buy"),
-                )
-            else:
-                st.info("No buy signals for this depot.")
-
-        with sub_all:
-            st.dataframe(_styled(results), use_container_width=True)
+            st.dataframe(_styled(sorted_results), width='stretch')
             st.download_button(
                 "⬇ Download CSV",
-                pd.DataFrame(results).to_csv(index=False).encode("utf-8"),
+                pd.DataFrame(sorted_results).to_csv(index=False).encode("utf-8"),
                 f"{depot['name']}_sepa_results.csv",
                 "text/csv",
                 key=_gk("dl_depot_all"),
             )
+
+        for _tier, _tier_tab in zip(_SO_d, _tier_tabs):
+            with _tier_tab:
+                _tier_rows = sorted(
+                    [r for r in results if r.get("Signal") == _tier],
+                    key=lambda r: r.get("Score") or 0,
+                    reverse=(_tier != "Sell-Panic"),
+                )
+                if _tier_rows:
+                    st.dataframe(_styled(_tier_rows), width='stretch')
+                    st.download_button(
+                        "⬇ Download CSV",
+                        pd.DataFrame(_tier_rows).to_csv(index=False).encode("utf-8"),
+                        f"{depot['name']}_{_tier.lower().replace('-', '_')}.csv",
+                        "text/csv",
+                        key=_gk(f"dl_depot_{_tier}"),
+                    )
+                else:
+                    st.info(f"No {_tier} signals for this depot.")
 
         with sub_chart:
             ticker_options = [r["Ticker"] for r in results]
@@ -623,6 +696,6 @@ for i, depot in enumerate(depots):
                 df_sel = ohlcv_data[selected]
                 ind_sel = compute_indicators(df_sel)
                 fig = build_detail_chart(df_sel, ind_sel, spy_df)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.warning(f"No price data available for {selected}.")

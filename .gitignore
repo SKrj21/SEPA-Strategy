@@ -8,3 +8,15 @@ __pycache__/
 .venv/
 venv/
 .env
+
+# Stride / Claude internal
+.stride/
+.claude/
+
+# Cache / generated
+isin_cache.json
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
