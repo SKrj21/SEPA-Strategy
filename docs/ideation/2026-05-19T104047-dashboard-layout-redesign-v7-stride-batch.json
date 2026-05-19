@@ -1,0 +1,206 @@
+{
+  "source_spec": "docs/ideation/2026-05-19T104047-dashboard-layout-redesign-v7-requirements.md",
+  "source_spec_sha256": "9e386d58102e27ff5652558d9f37fd00e9f3d5ffffcd95bf14eb245f1430c062",
+  "decomposition_notes": "Single-goal shape — all work lives in app.py (the only file the constraint permits modifying). The two deliverables (status bar and depot summary table) are code-coupled: both read from the same depot_results pipeline in app.py and both live in the Overview tab block. Five tasks ordered by dependency: (1) capture scan timestamp in session state, (2) render status bar, (3) add _build_depot_summary() helper, (4) render the Depot-Ubersicht table, (5) run full test suite to verify 193 tests green. Tasks 1 and 2 are independent of 0, allowing some parallelism. Task 3 depends on both 1 and 2. Task 4 depends on all prior tasks.",
+  "goals": [
+    {
+      "title": "Add Overview status bar and Depot-Ubersicht summary table to app.py",
+      "type": "goal",
+      "complexity": "medium",
+      "priority": "high",
+      "needs_review": false,
+      "why": "Users must navigate to each depot tab individually to assess depot health with no single view for side-by-side comparison, and there is no persistent freshness indicator to confirm data currency. Both gaps are addressed by the status bar and per-depot summary table on the Overview tab.",
+      "what": "Modify app.py to: (1) capture a scan-completion timestamp in session state after the screening loop, (2) render a one-line status bar at the top of the Overview tab showing scan time, last-scan datetime, auto-scan countdown (static), and a Re-scan button, (3) add _build_depot_summary() helper that computes per-depot summary rows from depot_results, (4) render the Depot-Ubersicht table with colour-coded signal cells and a GESAMT totals row. No changes to screener.py, indicators.py, or classifier.py.",
+      "where_context": "app.py only — Section 3 screening loop (timestamp capture), Overview tab block Section 4 (status bar, summary table). All five tasks touch only app.py.",
+      "acceptance_criteria": "After scan, session state contains scan_completed_at with a datetime value\nOverview tab shows a one-line status bar: check-mark icon + scan time + last-scan datetime + auto-scan interval + Re-scan button\nRe-scan button in status bar clears screen_ and depot_ session state keys and calls st.rerun()\nDepot-Ubersicht table appears with columns: Depot | Stocks | Score O | Buy | Bullish | Neutral | Bearish | Sell-Panic | Errors\nOne row per depot plus GESAMT totals row at the bottom\nSignal tier count cells with value > 0 are colour-coded using existing _SIGNAL_COLOURS palette\nScore O is mean RS Rating of non-None values, displayed to 1 decimal place\nErrors = count of failed_isins for the depot\nTable renders correctly in both depot_config.json mode and single-depot auto-discovery fallback\nAll 193 existing tests remain green\nNo new pip dependencies",
+      "pitfalls": [
+        "depot_results contains (results, excluded) tuples; index alignment with the depots list is load-bearing — verify alignment before zipping",
+        "Score O must exclude rows where RS Rating is None; a mean over all rows will produce NaN silently if any row has None",
+        "The _gk() widget key manager must be used for any new button or widget added in the Overview tab to prevent DuplicateElementKey errors on re-run",
+        "The auto-scan countdown is a static display of the configured interval — do not attempt a live countdown that requires JS injection or a new dependency",
+        "st.dataframe does not natively apply per-cell background colours; use df.style with a map/applymap call mirroring the existing _styled() pattern — do not use st.table",
+        "Pandas Styler format() for Score O must handle None values — use na_rep='-' to avoid TypeError"
+      ],
+      "tasks": [
+        {
+          "title": "Capture scan_completed_at timestamp in session state after screening loop",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Immediately after the _screen_prog.empty() call that concludes the Section 3 screening loop in app.py, write the current datetime into st.session_state under the key 'scan_completed_at'. Guard the write with 'scan_completed_at' not in st.session_state so cached re-renders do not overwrite the real scan time. Add 'import datetime' at the top of app.py if not already present.",
+          "why": "The status bar must show a scan-completion timestamp. Writing it once at the point of completion ensures the timestamp reflects the actual scan time and survives tab switches without being reset.",
+          "what": "In app.py: add 'import datetime' at top if missing; after _screen_prog.empty(), add: if 'scan_completed_at' not in st.session_state: st.session_state['scan_completed_at'] = datetime.datetime.now()",
+          "where_context": "app.py — import block (top of file); Section 3 screening loop ending near _screen_prog.empty()",
+          "acceptance_criteria": "datetime is imported at the top of app.py\nst.session_state['scan_completed_at'] is set to a datetime.datetime object after scan completes\nThe assignment is guarded: only executes when 'scan_completed_at' is not already in session state\nscreener.py, indicators.py, classifier.py are unmodified",
+          "patterns_to_follow": "Follow the existing session state guard pattern: check 'key' not in st.session_state before writing\nUse datetime.datetime.now() — no timezone library, no new dependency",
+          "pitfalls": [
+            "Do not place the write inside the per-depot screening loop — it must execute once after all depots are screened",
+            "Do not clear scan_completed_at in the Re-scan session state clear block — it will be overwritten on the next completed scan"
+          ],
+          "dependencies": [],
+          "key_files": [
+            {"file_path": "app.py", "note": "Add datetime import at top; add scan_completed_at write after _screen_prog.empty()", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run 'streamlit run app.py', complete a scan, confirm scan_completed_at appears in Streamlit session state inspector with a datetime value", "expected_result": "scan_completed_at key present with datetime.datetime value", "position": 0},
+            {"step_type": "manual", "step_text": "Click Re-scan and confirm the timestamp updates to a new value after the next scan completes", "expected_result": "scan_completed_at updated to new scan time", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": ["scan_completed_at set after scan completes", "cached page load does not overwrite timestamp"],
+            "edge_cases": ["Cached page load (no new scan) — timestamp must NOT be overwritten"],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Render status bar at top of Overview tab",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "At the top of the Overview tab block (with tabs[0]:) in app.py, before the existing metrics columns, render a single-line status bar. Show: (1) check-mark + 'Scan completed HH:MM:SS' from st.session_state.get('scan_completed_at'), (2) 'Last scan: DD.MM.YYYY HH:MM:SS', (3) 'Next auto-scan in X min' where X is from session state or defaults to 60, (4) a Re-scan button using _gk('rescan_overview') that clears screen_ and depot_ keys and calls st.rerun(). Show a placeholder when scan_completed_at is absent.",
+          "why": "Users need a persistent freshness indicator on the Overview tab to assess data currency without navigating to the sidebar.",
+          "what": "Insert st.columns layout at start of 'with tabs[0]:' block. Read scan_completed_at from session state. Format as check-mark + time + last-scan + auto-scan interval. Add Re-scan button. If scan_completed_at is not yet set, show a waiting placeholder.",
+          "where_context": "app.py — inside 'with tabs[0]:' block, before the existing ov_c1/ov_c2/ov_c3/ov_c4 metrics row",
+          "acceptance_criteria": "Status bar is the first element inside tabs[0]\nShows check-mark, scan time (HH:MM:SS), last-scan full datetime (DD.MM.YYYY HH:MM:SS), and static auto-scan interval\nRe-scan button clears session state keys starting with 'screen_' and 'depot_' and calls st.rerun()\n_gk() is used for the Re-scan button key\nIf scan_completed_at is absent, a placeholder is shown without KeyError\nStatus bar does NOT appear on per-depot tabs",
+          "patterns_to_follow": "Reuse the existing Re-scan button logic from the sidebar — same session state key clearing\nUse st.columns for layout; no raw HTML or JS injection\nRead refresh_mins from session state with a default of 60 if not present",
+          "pitfalls": [
+            "The Re-scan button here and the sidebar Re-scan button must clear the same set of session state keys",
+            "refresh_mins is set inside the sidebar block; read from session state or use a module-level default to avoid NameError in the tabs block",
+            "Do not use st.components.v1.html — no JS needed for static display"
+          ],
+          "dependencies": [0],
+          "key_files": [
+            {"file_path": "app.py", "note": "Overview tab block — insert status bar before existing metrics columns", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run app, complete a scan, navigate to Overview tab — status bar with timestamp and Re-scan button is visible as first element", "expected_result": "Status bar visible with formatted timestamp and Re-scan button", "position": 0},
+            {"step_type": "manual", "step_text": "Click Re-scan button in status bar — app re-runs and re-scans", "expected_result": "App re-runs; screening progress bar appears", "position": 1},
+            {"step_type": "manual", "step_text": "Navigate to a per-depot tab — confirm status bar does NOT appear there", "expected_result": "No status bar on per-depot tabs", "position": 2}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": ["Status bar visible after scan", "Re-scan button triggers rerun", "Placeholder shown before first scan"],
+            "edge_cases": ["scan_completed_at absent from session state — must not raise KeyError"],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Add _build_depot_summary() helper function to app.py",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Add a module-level helper function _build_depot_summary(depots, depot_results) to app.py after the _styled() helper. Accepts the depots list (dicts with 'name', 'tickers', 'failed_isins') and the depot_results list (list of (results, excluded) tuples, index-aligned with depots). Returns a list of dicts with keys: Depot, Stocks, 'Score O', Buy, Bullish, Neutral, Bearish, 'Sell-Panic', Errors. Appends a GESAMT totals row. Uses SIGNAL_ORDER from classifier.py to enumerate tiers.",
+          "why": "Isolating aggregation logic in a testable function keeps the Overview tab render block readable and the aggregation independently verifiable without Streamlit dependencies.",
+          "what": "Define _build_depot_summary(depots, depot_results) in app.py. For each (depot, (results, excluded)) pair: Stocks = len(results); Score O = mean of non-None RS Ratings (None if list empty); each signal tier count = sum(1 for r in results if r.get('Signal') == tier); Errors = len(depot['failed_isins']). Append GESAMT row summing int columns and averaging Score O values.",
+          "where_context": "app.py — define after _styled() helper function, before Section 4 Overview tab block",
+          "acceptance_criteria": "_build_depot_summary is defined in app.py before the Section 4 block\nReturns a list of dicts; last entry has Depot == 'GESAMT'\nStocks = len(results) for each depot\nScore O is mean of non-None RS Rating values to 1 decimal, or None if no RS Ratings\nEach signal tier column counts correctly\nErrors = len(depot['failed_isins'])\nGESAMT row sums all int columns; Score O is mean of per-depot Score O values (excluding None)",
+          "patterns_to_follow": "Use SIGNAL_ORDER from classifier (already imported in app.py) for stable tier enumeration\nUse list comprehensions rather than pandas for the aggregation to keep the function dependency-light",
+          "pitfalls": [
+            "depots and depot_results are index-aligned; verify alignment before iterating — do not use zip if it could be disrupted by the upload flow",
+            "Score O must be None (not NaN or 0) when no stock has a valid RS Rating",
+            "GESAMT Score O should average per-depot means, not re-average all individual stocks"
+          ],
+          "dependencies": [],
+          "key_files": [
+            {"file_path": "app.py", "note": "Add _build_depot_summary() after _styled() and before Section 4", "position": 0},
+            {"file_path": "classifier.py", "note": "SIGNAL_ORDER consumed by the helper for stable tier enumeration", "position": 1}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "In a Python REPL, import or paste _build_depot_summary, construct synthetic depots and depot_results with known values, verify returned list has one row per depot plus GESAMT with correct totals", "expected_result": "Returned list length = len(depots) + 1; GESAMT row sums match", "position": 0},
+            {"step_type": "manual", "step_text": "Pass a depot with all RS Rating = None in results, verify Score O is None in the returned row", "expected_result": "Score O is None for that depot row", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": [
+              "Synthetic depots and depot_results with known counts — assert returned rows match expected values",
+              "Assert GESAMT row sums",
+              "Assert Score O = None when all RS Ratings are None"
+            ],
+            "integration_tests": [],
+            "manual_tests": ["REPL smoke test with real depot_results after a scan"],
+            "edge_cases": ["Single depot (auto-discovery fallback)", "Depot with zero results", "All RS Ratings None"],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Render Depot-Ubersicht table with colour-coded signal cells in Overview tab",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "In the Overview tab block, after the status bar and before the existing Buy Signals subheader, call _build_depot_summary(depots, depot_results), convert to DataFrame, apply per-cell background colours to signal tier columns (non-zero cells get the tier's colour from _SIGNAL_COLOURS; zero cells are unstyled), and render with st.dataframe(styler, use_container_width=True). Add st.subheader('Depot-Ubersicht') above the table. Format Score O to 1 decimal with na_rep='-'.",
+          "why": "This is the primary deliverable — the at-a-glance depot health table from the Outcome section. Placing it before the Buy Signals section matches the intended reading order.",
+          "what": "After status bar code: call _build_depot_summary, build DataFrame, define colour function that applies _SIGNAL_COLOURS[tier] to cells > 0 and empty string to zero/None cells, apply styles via df.style.map or df.style.apply, format Score O column, render. Visually distinguish GESAMT row (e.g. bold Depot cell).",
+          "where_context": "app.py — inside 'with tabs[0]:' block, after status bar code, before existing ov_c1/ov_c2/ov_c3/ov_c4 metrics row or directly before 'Buy Signals' subheader",
+          "acceptance_criteria": "st.subheader('Depot-Ubersicht') appears above the table\nColumns in order: Depot, Stocks, Score O, Buy, Bullish, Neutral, Bearish, Sell-Panic, Errors\nOne row per depot plus GESAMT row at bottom\nNon-zero Buy cells have green background matching _SIGNAL_COLOURS['Buy']\nNon-zero Bullish cells have light green background\nNon-zero Neutral cells have yellow background\nNon-zero Bearish cells have light red background\nNon-zero Sell-Panic cells have red background\nZero and None cells have no colour\nScore O displayed to 1 decimal (None shown as '-')\nTable renders in single-depot auto-discovery fallback without errors\nNo DuplicateElementKey error on re-run",
+          "patterns_to_follow": "Mirror existing _styled() function pattern using df.style map/applymap\nUse use_container_width=True consistent with all other table renders in app.py\nDo not use st.table",
+          "pitfalls": [
+            "Pandas Styler format() for Score O must handle None — use format('{:.1f}', na_rep='-')",
+            "The GESAMT row mixes str (Depot) and int/float columns — ensure int columns are not coerced to float by a None Score O in the GESAMT row",
+            "Colour function must check value > 0, not just the column name — zero count in Buy column must not be green"
+          ],
+          "dependencies": [1, 2],
+          "key_files": [
+            {"file_path": "app.py", "note": "Overview tab block — add Depot-Ubersicht table render after status bar", "position": 0}
+          ],
+          "verification_steps": [
+            {"step_type": "manual", "step_text": "Run app, complete scan with 2+ depots, navigate to Overview tab — Depot-Ubersicht table visible with one row per depot plus GESAMT", "expected_result": "Table visible with correct row count and GESAMT row", "position": 0},
+            {"step_type": "manual", "step_text": "Confirm Buy column cells with value > 0 have green background; cells with 0 have no colour", "expected_result": "Non-zero Buy cells green; zero Buy cells unstyled", "position": 1},
+            {"step_type": "manual", "step_text": "Remove depot_config.json, re-run app, confirm table renders with one depot row plus GESAMT", "expected_result": "Single-depot fallback renders without errors", "position": 2},
+            {"step_type": "manual", "step_text": "Confirm Score O shows one decimal place (e.g. 82.3 not 82.333)", "expected_result": "Score O formatted to 1 decimal", "position": 3}
+          ],
+          "testing_strategy": {
+            "unit_tests": [],
+            "integration_tests": [],
+            "manual_tests": [
+              "Table visible with correct columns",
+              "Signal tier colour coding correct for non-zero cells",
+              "Single-depot fallback mode renders without error",
+              "Score O formatted correctly"
+            ],
+            "edge_cases": ["All signal counts zero", "Depot with None Score O", "GESAMT row with single depot"],
+            "coverage_target": ""
+          }
+        },
+        {
+          "title": "Verify all 193 existing tests remain green after Overview tab changes",
+          "type": "work",
+          "complexity": "small",
+          "priority": "high",
+          "needs_review": false,
+          "description": "Run the full test suite to confirm that none of the changes in tasks 0-3 have broken existing tests. The constraint states screener.py, indicators.py, and classifier.py must not be modified; this task confirms that constraint was honoured and that no app.py changes introduced import errors or side effects visible to tests.",
+          "why": "The requirements doc explicitly states all 193 existing tests must remain green. This is a hard constraint.",
+          "what": "Run pytest from the project root targeting tests/. Confirm all tests pass. If any test fails, fix the root cause in app.py; do not modify test files to mask failures.",
+          "where_context": "tests/ directory — all test files",
+          "acceptance_criteria": "pytest tests/ exits with 0 failures\nTest count is 193 or more\nNo test in test_classifier.py, test_screener.py, or test_indicators.py fails\nNo import errors from any test module caused by app.py changes",
+          "patterns_to_follow": "Run pytest without modification flags — do not skip or deselect tests\nFix root causes in app.py; do not modify test files",
+          "pitfalls": [
+            "app.py imports classifier at module level — if the import was refactored, confirm classifier.py was not modified",
+            "_build_depot_summary added to app.py must not have introduced any module-level side effects that interfere with test imports"
+          ],
+          "dependencies": [0, 1, 2, 3],
+          "key_files": [
+            {"file_path": "tests/test_classifier.py", "note": "Must remain green — classifier.py not modified", "position": 0},
+            {"file_path": "tests/test_screener.py", "note": "Must remain green — screener.py not modified", "position": 1},
+            {"file_path": "tests/test_indicators.py", "note": "Must remain green — indicators.py not modified", "position": 2}
+          ],
+          "verification_steps": [
+            {"step_type": "command", "step_text": "python -m pytest tests/ -v 2>&1 | tail -20", "expected_result": "All tests pass; final line shows 193 passed (or higher); 0 failures, 0 errors", "position": 0},
+            {"step_type": "command", "step_text": "python -m pytest tests/test_classifier.py tests/test_screener.py tests/test_indicators.py -v", "expected_result": "All tests in the three protected-module test files pass with 0 failures", "position": 1}
+          ],
+          "testing_strategy": {
+            "unit_tests": ["Run full existing test suite without modification"],
+            "integration_tests": [],
+            "manual_tests": [],
+            "edge_cases": ["Import errors from app.py changes bleeding into test collection"],
+            "coverage_target": "193 existing tests green"
+          }
+        }
+      ]
+    }
+  ]
+}
