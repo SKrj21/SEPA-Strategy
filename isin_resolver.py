@@ -132,7 +132,7 @@ def _score_quote(quote: dict, country_code: str) -> float:
 
 # ── Core lookup ────────────────────────────────────────────────────────────────
 
-def _lookup(isin: str) -> str | None:
+def _lookup(isin: str, wkn_hint: str | None = None) -> str | None:
     country_code = isin[:2].upper()
 
     # 1. Manual override map
@@ -140,7 +140,20 @@ def _lookup(isin: str) -> str | None:
     if isin in manual:
         return manual[isin]
 
-    # 2. Yahoo Finance search API (country-aware ranking)
+    # 2. WKN hint — try first when available (shorter, more specific than ISIN
+    #    for Yahoo Finance search; German brokers like Smartbroker provide this)
+    if wkn_hint:
+        quotes = _yahoo_search(wkn_hint)
+        if quotes:
+            scored = sorted(quotes, key=lambda q: _score_quote(q, country_code), reverse=True)
+            best = scored[0]
+            if _score_quote(best, country_code) >= 0:
+                symbol = best.get("symbol", "").strip()
+                if symbol:
+                    logger.debug("WKN hint %r resolved %s → %s", wkn_hint, isin, symbol)
+                    return symbol
+
+    # 3. Yahoo Finance search API by ISIN (country-aware ranking)
     quotes = _yahoo_search(isin)
     if quotes:
         scored = sorted(
@@ -154,7 +167,7 @@ def _lookup(isin: str) -> str | None:
             if symbol:
                 return symbol
 
-    # 3. yf.Search fallback (always runs for US; also catches stragglers)
+    # 4. yf.Search fallback (always runs for US; also catches stragglers)
     def _yf_search() -> str | None:
         for q in yf.Search(isin, max_results=5).quotes:
             sym = q.get("symbol", "").strip()
@@ -173,23 +186,24 @@ def _lookup(isin: str) -> str | None:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def resolve_isin(isin: str) -> str | None:
+def resolve_isin(isin: str, wkn_hint: str | None = None) -> str | None:
     if not isin or not isinstance(isin, str):
         return None
     isin = isin.strip().upper()
     cache = _load_cache()
     if isin in cache:
         return cache[isin] or None
-    ticker = _lookup(isin)
+    ticker = _lookup(isin, wkn_hint=wkn_hint)
     cache[isin] = ticker or ""
     _save_cache(cache)
     return ticker
 
 
-def batch_resolve(isins: list[str]) -> dict[str, str]:
+def batch_resolve(isins: list[str], wkn_map: dict[str, str] | None = None) -> dict[str, str]:
     cache = _load_cache()
     result: dict[str, str] = {}
     updated = False
+    _wkn = wkn_map or {}
 
     for raw in isins:
         if not raw:
@@ -199,7 +213,7 @@ def batch_resolve(isins: list[str]) -> dict[str, str]:
             if cache[isin]:
                 result[isin] = cache[isin]
         else:
-            ticker = _lookup(isin)
+            ticker = _lookup(isin, wkn_hint=_wkn.get(isin))
             cache[isin] = ticker or ""
             updated = True
             if ticker:

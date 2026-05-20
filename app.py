@@ -7,7 +7,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from charts import build_detail_chart
-from csv_loader import discover_csv_files, load_csv_file, load_csv_name_map
+from csv_loader import discover_csv_files, load_csv_file, load_csv_isin_wkn_map, load_csv_name_map
 from data_fetcher import fetch_ohlcv, fetch_spy_benchmark, fetch_ticker_names
 from indicators import compute_indicators
 from isin_resolver import resolve_isin
@@ -128,6 +128,14 @@ def _names_from_depot_def(depot_def: dict) -> dict[str, str]:
     return name_map
 
 
+def _wkn_from_depot_def(depot_def: dict) -> dict[str, str]:
+    """Build {ISIN: WKN} from all files in a depot definition (Smartbroker only)."""
+    wkn_map: dict[str, str] = {}
+    for fname in depot_def.get("files", []):
+        wkn_map.update(load_csv_isin_wkn_map(APP_DIR / fname))
+    return wkn_map
+
+
 def _build_ticker_to_name(isin_map: dict[str, str], raw_tickers: list[str], isin_name_map: dict[str, str]) -> dict[str, str]:
     """Map resolved tickers → display names using the per-file ISIN→name map."""
     ticker_to_name: dict[str, str] = {}
@@ -140,7 +148,11 @@ def _build_ticker_to_name(isin_map: dict[str, str], raw_tickers: list[str], isin
     return ticker_to_name
 
 
-def _resolve_entries(depot_name: str, entries: list[str]) -> tuple[list[str], list[str], dict[str, str]]:
+def _resolve_entries(
+    depot_name: str,
+    entries: list[str],
+    wkn_map: dict[str, str] | None = None,
+) -> tuple[list[str], list[str], dict[str, str]]:
     """Resolve ISINs to ticker symbols; returns (tickers, failed_isins, isin_to_ticker)."""
     key_t = f"depot_{depot_name}_tickers"
     if key_t in st.session_state:
@@ -154,11 +166,12 @@ def _resolve_entries(depot_name: str, entries: list[str]) -> tuple[list[str], li
     raw_tickers = [e for e in entries if not (len(e) == 12 and e[:2].isalpha())]
     resolved: dict[str, str] = {}
     failed: list[str] = []
+    _wkn = wkn_map or {}
 
     if raw_isins:
         prog = st.progress(0, text=f"Resolving ISINs for {depot_name}…")
         for i, isin in enumerate(raw_isins):
-            ticker = resolve_isin(isin)
+            ticker = resolve_isin(isin, wkn_hint=_wkn.get(isin))
             if ticker:
                 resolved[isin] = ticker
             else:
@@ -186,7 +199,8 @@ if depot_config:
         name = depot_def.get("name", "Depot")
         entries = _entries_from_depot_def(depot_def)
         isin_name_map = _names_from_depot_def(depot_def)
-        tickers, failed, isin_map = _resolve_entries(name, entries)
+        wkn_map = _wkn_from_depot_def(depot_def)
+        tickers, failed, isin_map = _resolve_entries(name, entries, wkn_map=wkn_map)
         raw_t = [e for e in entries if not (len(e) == 12 and e[:2].isalpha())]
         ticker_to_name = _build_ticker_to_name(isin_map, raw_t, isin_name_map)
         depots.append({"name": name, "tickers": tickers, "failed_isins": failed, "isin_map": isin_map, "ticker_to_name": ticker_to_name})
@@ -214,7 +228,9 @@ else:
     # Separate ISINs from legacy tickers across all discovered files
     raw_isins: list[str] = []
     raw_tickers: list[str] = []
+    _global_wkn_map: dict[str, str] = {}
     for _fname, _entries in discovered.items():
+        _global_wkn_map.update(load_csv_isin_wkn_map(APP_DIR / _fname))
         for e in _entries:
             e = e.strip().upper()
             if len(e) == 12 and e[:2].isalpha():
@@ -234,7 +250,7 @@ else:
         resolved_map: dict[str, str] = {}
         failed_isins: list[str] = []
         for i, isin in enumerate(raw_isins):
-            ticker = resolve_isin(isin)
+            ticker = resolve_isin(isin, wkn_hint=_global_wkn_map.get(isin))
             if ticker:
                 resolved_map[isin] = ticker
             else:

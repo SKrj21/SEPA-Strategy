@@ -118,6 +118,34 @@ def load_csv_file(path: Path) -> list[str]:
     raise ValueError(f"'{path.name}': Unknown format '{fmt}'")  # unreachable
 
 
+def load_csv_isin_wkn_map(path: Path) -> dict[str, str]:
+    """Return {ISIN: WKN} for broker CSVs that carry a WKN column (e.g. Smartbroker).
+
+    WKN codes are short German securities identifiers that Yahoo Finance's search
+    API resolves more reliably than ISINs — use as a priority lookup hint.
+    Returns an empty dict for formats without a WKN column.
+    """
+    try:
+        df = _try_read(path)
+        df.columns = [c.strip() for c in df.columns]
+        fmt = _detect_format(list(df.columns))
+        if fmt != "smartbroker":
+            return {}
+        isin_col = _find_col(df, "ISIN")
+        wkn_col = _find_col(df, "WKN", "Wkn", "wkn")
+        if not isin_col or not wkn_col:
+            return {}
+        result: dict[str, str] = {}
+        for _, row in df.iterrows():
+            isin = str(row[isin_col]).strip().upper()
+            wkn = str(row[wkn_col]).strip()
+            if _is_valid_isin(isin) and wkn and wkn.lower() != "nan":
+                result[isin] = wkn
+        return result
+    except Exception:
+        return {}
+
+
 def load_csv_name_map(path: Path) -> dict[str, str]:
     """Return {isin_or_ticker: display_name} from a broker CSV.
 
