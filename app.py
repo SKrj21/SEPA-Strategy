@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 
 from charts import build_detail_chart
 from csv_loader import discover_csv_files, load_csv_file, load_csv_isin_wkn_map, load_csv_name_map
-from data_fetcher import fetch_ohlcv, fetch_spy_benchmark, fetch_ticker_names
+from data_fetcher import fetch_ohlcv, fetch_single_ohlcv, fetch_spy_benchmark, fetch_ticker_names
 from indicators import compute_indicators
 from isin_resolver import resolve_isin
 from classifier import classify_signal
@@ -396,12 +396,36 @@ st.write(f"Fetching 2 years of daily OHLCV data for **{len(all_tickers)}** ticke
 ohlcv_data = fetch_ohlcv(tuple(all_tickers))
 spy_df = fetch_spy_benchmark()
 
+ohlcv_data = dict(ohlcv_data)  # mutable copy so we can add retry results
+
+# ISIN retry: for each depot, find failed tickers that originated from an ISIN and
+# re-resolve fresh (force=True bypasses the cache) to catch stale mappings.
+for d in depots:
+    _reverse_isin = {ticker: isin for isin, ticker in d["isin_map"].items()}
+    _failed = [t for t in d["tickers"] if t not in ohlcv_data and t in _reverse_isin]
+    if not _failed:
+        continue
+    for old_ticker in _failed:
+        isin = _reverse_isin[old_ticker]
+        new_ticker = resolve_isin(isin, force=True)
+        if new_ticker and new_ticker != old_ticker and new_ticker not in ohlcv_data:
+            df = fetch_single_ohlcv(new_ticker)
+            if df is not None:
+                ohlcv_data[new_ticker] = df
+                # update depot so downstream screening uses the new ticker
+                d["isin_map"][isin] = new_ticker
+                d["tickers"] = [new_ticker if t == old_ticker else t for t in d["tickers"]]
+                if old_ticker in d.get("ticker_to_name", {}):
+                    d["ticker_to_name"][new_ticker] = d["ticker_to_name"].pop(old_ticker)
+
 loaded = len(ohlcv_data)
-failed_fetch = len(all_tickers) - loaded
-st.success(
-    f"Loaded data for **{loaded}** ticker(s)."
-    + (f" {failed_fetch} ticker(s) had no data and were skipped." if failed_fetch else "")
-)
+st.success(f"Loaded data for **{loaded}** ticker(s).")
+for d in depots:
+    _no_data = [t for t in d["tickers"] if t not in ohlcv_data]
+    if _no_data:
+        with st.expander(f"⚠️ {d['name']}: {len(_no_data)} ticker(s) had no data"):
+            st.write(", ".join(_no_data))
+            st.caption("These tickers may be delisted or recently acquired — no market data available.")
 
 
 # ── Section 3: Screening ───────────────────────────────────────────────────────

@@ -186,12 +186,12 @@ def _lookup(isin: str, wkn_hint: str | None = None) -> str | None:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def resolve_isin(isin: str, wkn_hint: str | None = None) -> str | None:
+def resolve_isin(isin: str, wkn_hint: str | None = None, force: bool = False) -> str | None:
     if not isin or not isinstance(isin, str):
         return None
     isin = isin.strip().upper()
     cache = _load_cache()
-    if isin in cache:
+    if not force and isin in cache:
         return cache[isin] or None
     ticker = _lookup(isin, wkn_hint=wkn_hint)
     cache[isin] = ticker or ""

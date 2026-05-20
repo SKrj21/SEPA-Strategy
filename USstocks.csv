@@ -1,0 +1,516 @@
+ISIN;Ticker;Sector;Name
+US88579Y1010;MMM;Industrials;3M Company
+US8318652091;AOS;Industrials;A.O. Smith
+US00766T1007;;;AECOM
+US00130H1059;;;AES
+US03662Q1058;ANSS;Information Technology;ANSYS Inc.
+US03743Q1085;;;APA Corporation
+US00206R1023;T;Communication Services;AT&T Inc.
+US00287Y1091;ABBV;Health Care;AbbVie
+US0028241000;ABT;Health Care;Abbott Laboratories
+US00508Y1029;;;Acuity Brands Inc.
+US00724F1012;ADBE;Information Technology;Adobe
+US00751Y1064;;;Advance Auto Parts
+US0079031078;AMD;Information Technology;Advanced Micro Devices Inc.
+US00827B1061;;;Affirm Holdings Inc.
+US0010551028;AFL;Financials;Aflac
+US0010841023;;;Agco Corporation
+US00846U1016;A;Health Care;Agilent Technologies
+US0091581068;APD;Materials;Air Products and Chemicals
+US0090661010;ABNB;Consumer Discretionary;Airbnb
+US00971T1016;;;Akamai
+US0116591092;;;Alaska Air Group
+US0126531013;ALB;Materials;Albemarle
+US0152711091;ARE;Real Estate;Alexandria Real Estate Equities
+US0162551016;ALGN;Health Care;Align Technology
+US0188021085;LNT;Utilities;Alliant Energy
+US0200021014;ALL;Financials;Allstate
+US02079K3059;GOOGL;Communication Services;Alphabet Inc. (Class A)
+US02079K1079;GOOG;Communication Services;Alphabet Inc. (Class C)
+US02209S1033;MO;Consumer Staples;Altria
+US0231351067;AMZN;Consumer Discretionary;Amazon.com Inc.
+US02341R3023;AMCR;Materials;Amcor plc
+US0236081024;AEE;Utilities;Ameren
+US0255371017;AEP;Utilities;American Electric Power
+US0258161092;AXP;Financials;American Express Co.
+US0268747849;;;American International Group (AIG)
+US03027X1000;AMT;Real Estate;American Tower
+US0304201033;AWK;Utilities;American Water Works
+US03076C1062;AMP;Financials;Ameriprise Financial
+US0311001004;AME;Industrials;Ametek
+US0311621009;AMGN;Health Care;Amgen Inc.
+US0320951017;APH;Information Technology;Amphenol
+US0326541051;ADI;Information Technology;Analog Devices
+US03769M1062;;;Apollo Global Management Inc.
+US03831W1080;;;AppLovin Corporation
+US0378331005;AAPL;Information Technology;Apple Inc.
+US0382221051;AMAT;Information Technology;Applied Materials
+US0394831020;ADM;Consumer Staples;Archer Daniels Midland
+US03990B1017;;;Ares Management Corporation Class A
+US0404132054;ANET;Information Technology;Arista Networks
+US0420682058;;;Arm Holdings plc ADR
+US3635761097;;;Arthur J. Gallagher
+US04621X1081;AIZ;Financials;Assurant
+US0494681010;;;Atlassian Corporation
+US0495601058;ATO;Utilities;Atmos Energy
+US0533321024;;;AutoNation Inc.
+US05450G1040;AZO;Consumer Discretionary;AutoZone Inc.
+US0527691069;;;Autodesk Inc.
+US0530151036;ADP;Industrials;Automatic Data Processing
+US0534841012;AVB;Real Estate;AvalonBay Communities Inc.
+US0556221098;;;Avangrid
+US0567521085;;;Avantor Inc.
+US0536111091;AVY;Materials;Avery Dennison Corporation
+US05751C1099;;;Axalta Coating Systems
+US05464C1018;AXON;Industrials;Axon Enterprise
+US05722G1004;BKR;Energy;Baker Hughes
+US0585811054;BALL;Materials;Ball Corporation
+US0605051046;BAC;Financials;Bank of America Corp.
+US05964G1091;BK;Financials;Bank of New York Mellon Corp.
+US06071K1014;BAX;Health Care;Baxter International Inc.
+US0608161090;BDX;Health Care;Becton Dickinson and Co.
+US06165C1053;BRK.B;Financials;Berkshire Hathaway Inc. (Class B)
+US0625051043;BBY;Consumer Discretionary;Best Buy Co. Inc.
+US09061G1013;;;Bio-Rad Laboratories Inc. Class A
+US09062X1037;BIIB;Health Care;Biogen
+US0640581007;BLK;Financials;BlackRock Inc.
+US09260D1072;BX;Financials;Blackstone Inc.
+US06417N1037;;;Block Inc.
+US0970231058;BA;Industrials;Boeing Co.
+US09857L1089;BKNG;Consumer Discretionary;Booking Holdings Inc.
+US1011211018;BXP;Real Estate;Boston Properties Inc.
+US1011371077;BSX;Health Care;Boston Scientific Corporation
+US1101221083;BMY;Health Care;Bristol-Myers Squibb Company
+US11135F1012;AVGO;Information Technology;Broadcom Inc.
+US1113201073;BR;Industrials;Broadridge Financial Solutions Inc.
+US09073M1045;BRO;Financials;Brown & Brown Inc.
+US1156372096;BF.B;Consumer Staples;Brown-Forman Corporation Class B
+US1220171060;;;Burlington Stores Inc.
+US12541W2098;CHRW;Industrials;C.H. Robinson Worldwide Inc.
+US12504L1098;CBRE;Real Estate;CBRE Group Inc. Class A
+US12514G1085;CDW;Information Technology;CDW Corporation
+US15189X1054;CF;Materials;CF Industries Holdings Inc.
+US12572Q1058;CME;Financials;CME Group Inc.
+US1264081035;CSX;Industrials;CSX
+US1266501006;CVS;Health Care;CVS Health Corporation
+US1273871087;CDNS;Information Technology;Cadence Design Systems
+US12769G1004;CZR;Consumer Discretionary;Caesars Entertainment Inc.
+US1331311027;CPT;Real Estate;Camden Property Trust
+US1344291091;CPB;Consumer Staples;Campbell Soup Company
+US14040H1059;COF;Financials;Capital One Financial Corporation
+US1431301027;KMX;Consumer Discretionary;CarMax Inc.
+US14149Y1082;CAH;Health Care;Cardinal Health Inc.
+US14448C1045;CARR;Industrials;Carrier Global Corporation
+US1468691027;;;Carvana Co. Class A
+US1488061029;;;Catalent Inc.
+US1491231015;CAT;Industrials;Caterpillar Inc.
+US12503M1080;CBOE;Financials;Cboe Global Markets Inc.
+US1508701034;CE;Materials;Celanese Corporation
+US03073E1055;COR;Health Care;Cencora Inc.
+US15135B1017;CNC;Health Care;Centene Corporation
+US15189T1079;CNP;Utilities;CenterPoint Energy Inc.
+US1567001060;;;Ceridian HCM Holding Inc.
+US1598641074;;;Charles River Laboratories International Inc.
+US16119P1084;CHTR;Communication Services;Charter Communications Inc. Class A
+US1667641005;CVX;Energy;Chevron Corporation
+US1696561059;CMG;Consumer Discretionary;Chipotle Mexican Grill Inc.
+US1713401024;CHD;Consumer Staples;Church & Dwight Co. Inc.
+US1717793095;CI;Health Care;Cigna Group
+US1720621010;CINF;Financials;Cincinnati Financial Corporation
+US1729081059;CTAS;Industrials;Cintas
+US17275R1023;CSCO;Information Technology;Cisco Systems Inc.
+US1729674242;C;Financials;Citigroup Inc.
+US1746101054;CFG;Financials;Citizens Financial Group Inc.
+US1858991011;;;Cleveland-Cliffs Inc.
+US1890541097;CLX;Consumer Staples;Clorox Company
+US18915M1071;;;Cloudflare Inc. Class A
+US22160N1090;CSGP;Real Estate;CoStar Group
+US1912161007;KO;Consumer Staples;Coca-Cola Co.
+US1924221039;;;Cognex Corp.
+US1897541040;;;Cognex Corporation
+US1924461023;CTSH;Information Technology;Cognizant
+US1941621039;CL;Consumer Staples;Colgate-Palmolive Company
+US20030N1019;CMCSA;Communication Services;Comcast
+US2003401070;;;Comerica Incorporated
+US1999081045;;;Comfort Systems USA Inc.
+US2058871029;CAG;Consumer Staples;ConAgra Brands Inc.
+US20825C1045;COP;Energy;ConocoPhillips
+US2091151041;ED;Utilities;Consolidated Edison Inc.
+US21036P1084;STZ;Consumer Staples;Constellation Brands Inc. Class A
+US21037T1097;CEG;Utilities;Constellation Energy
+US2166485019;COO;Health Care;Cooper Companies Inc.
+US2166484020;;;"Cooper Companies; Inc."
+US2172041061;CPRT;Industrials;Copart
+US2193501051;GLW;Information Technology;Corning Incorporated
+US2199481068;CPAY;Financials;Corpay Inc.
+US22160K1051;COST;Consumer Staples;Costco Wholesale
+US22052L1044;CTRA;Energy;Coterra Energy Inc.
+US22788C1053;CRWD;Information Technology;CrowdStrike
+US22822V1017;CCI;Real Estate;Crown Castle Inc.
+US2310211063;CMI;Industrials;Cummins Inc.
+US2315611010;;;Curtiss-Wright Corporation
+US23331A1097;DHI;Consumer Discretionary;D.R. Horton Inc.
+US24906P1093;;;DENTSPLY SIRONA Inc.
+US2333311072;DTE;Utilities;DTE Energy Company
+US23918K1088;;;DaVita Inc.
+US2358511028;DHR;Health Care;Danaher Corporation
+US2371941053;DRI;Consumer Discretionary;Darden Restaurants Inc.
+US2372661015;;;Darling Ingredients Inc.
+US23804L1035;;;Datadog Inc. Class A
+US2435371073;;;Deckers Outdoor Corporation
+US2441991054;DE;Industrials;Deere & Company
+US24703L2025;;;Dell Technologies Inc. Class C
+US2473617023;DAL;Industrials;Delta Air Lines Inc.
+US25179M1036;DVN;Energy;Devon Energy Corporation
+US2521311074;DXCM;Health Care;DexCom
+US25278X1090;FANG;Energy;Diamondback Energy
+US2538681030;;;Digital Realty Trust Inc.
+US2547091080;DFS;Financials;Discover Financial Services
+US2566771059;DG;Consumer Staples;Dollar General Corporation
+US2567461080;DLTR;Consumer Staples;Dollar Tree
+US25746U1097;D;Utilities;Dominion Energy Inc.
+US25754A2015;DPZ;Consumer Discretionary;Domino's Pizza Inc.
+US25809K1051;;;DoorDash Inc. Class A
+US2600031080;DOV;Industrials;Dover Corporation
+US2605571031;DOW;Materials;Dow Inc.
+US26614N1028;;;DuPont de Nemours Inc.
+US26441C2044;DUK;Utilities;Duke Energy Corporation
+US26875P1012;EOG;Energy;EOG Resources Inc.
+US27579R1041;;;East West Bancorp Inc.
+US2774321002;EMN;Materials;Eastman Chemical Company
+US2788651006;ECL;Materials;Ecolab Inc.
+US2810201077;EIX;Utilities;Edison International
+US28176E1082;EW;Health Care;Edwards Lifesciences Corporation
+US2855121099;EA;Communication Services;Electronic Arts
+US5324571083;LLY;Health Care;Eli Lilly and Company
+US29084Q1004;;;Emcor Group Inc.
+US2910111044;EMR;Industrials;Emerson Electric Co.
+US29355A1079;ENPH;Information Technology;Enphase Energy
+US29261A1007;;;Entegris Inc.
+US29364G1031;ETR;Utilities;Entergy Corporation
+US2944291051;EFX;Industrials;Equifax Inc.
+US29444U7000;EQIX;Real Estate;Equinix Inc.
+US29786A1060;;;Ericsson ADR
+US29530P1021;;;Erie Indemnity Company Class A
+US2971781057;ESS;Real Estate;Essex Property Trust Inc.
+US29788T1034;;;Estee Lauder Companies Inc. Class A
+US29977A1051;;;Evercore Inc. Class A
+US30034W1062;EVRG;Utilities;Evergy Inc.
+US30040W1080;ES;Utilities;Eversource Energy
+US30161N1019;EXC;Utilities;Exelon
+US30212P3038;EXPE;Consumer Discretionary;Expedia Group Inc.
+US3021301094;;;Expeditors International of Washington Inc.
+US30225T1025;EXR;Real Estate;Extra Space Storage Inc.
+US30231G1022;XOM;Energy;Exxon Mobil Corporation
+US3156161024;;;F5 Inc.
+US3024913036;FMC;Materials;FMC Corporation
+US3030751057;;;FactSet Research Systems Inc.
+US3032501047;FICO;Information Technology;Fair Isaac Corporation
+US3119001044;FAST;Industrials;Fastenal
+US31428X1063;FDX;Industrials;FedEx Corporation
+US3137451015;FRT;Real Estate;Federal Realty Investment Trust
+US31620M1062;FIS;Financials;Fidelity National Information Services Inc.
+US3167731005;FITB;Financials;Fifth Third Bancorp
+US31946M1036;;;First Citizens BancShares Inc. Class A
+US3364331070;FSLR;Information Technology;First Solar Inc.
+US3379321074;FE;Utilities;FirstEnergy Corp.
+US3377381088;FI;Financials;Fiserv Inc.
+US3453708600;F;Consumer Discretionary;Ford Motor Company
+US34959E1091;FTNT;Information Technology;Fortinet Inc.
+US34959J1088;FTV;Industrials;Fortive Corporation
+US35137L1052;FOXA;Communication Services;Fox Corporation Class A
+US35137L1052;FOX;Communication Services;Fox Corporation Class A
+US35137L2043;FOXA;Communication Services;Fox Corporation Class B
+US35137L2043;FOX;Communication Services;Fox Corporation Class B
+US3546131018;BEN;Financials;Franklin Resources Inc.
+US35671D8570;FCX;Materials;Freeport-McMoRan Inc.
+US3696043013;GE;Industrials;GE Aerospace
+US36266G1076;;;GE HealthCare Technologies Inc.
+US36828A1016;GEV;Industrials;GE Vernova Inc.
+US3666511072;IT;Information Technology;Gartner Inc.
+US6687711084;GEN;Information Technology;Gen Digital Inc.
+US3687361044;GNRC;Industrials;Generac Holdings Inc.
+US3695501086;GD;Industrials;General Dynamics Corporation
+US3703341046;GIS;Consumer Staples;General Mills Inc.
+US37045V1008;GM;Consumer Discretionary;General Motors Company
+US3724601055;GPC;Consumer Discretionary;Genuine Parts Company
+US3755581036;GILD;Health Care;Gilead Sciences
+US37940X1028;GPN;Financials;Global Payments Inc.
+US37959E1029;GL;Financials;Globe Life Inc.
+US3802371076;GDDY;Information Technology;GoDaddy Inc. Class A
+US38141G1040;GS;Financials;Goldman Sachs Group Inc.
+US40412C1018;HCA;Health Care;HCA Healthcare Inc.
+US40434L1052;HPQ;Information Technology;HP Inc.
+US4062161017;HAL;Energy;Halliburton Company
+US4165151048;HIG;Financials;Hartford Financial Services Group Inc.
+US4180561072;HAS;Consumer Discretionary;Hasbro Inc.
+US42250P1030;DOC;Real Estate;Healthpeak Properties Inc.
+US8064071025;HSIC;Health Care;Henry Schein Inc.
+US4278661081;HSY;Consumer Staples;Hershey Company
+US42809H1077;HES;Energy;Hess Corporation
+US42824C1099;HPE;Information Technology;Hewlett Packard Enterprise Company
+US43300A2033;HLT;Consumer Discretionary;Hilton Worldwide Holdings Inc.
+US4364401012;HOLX;Health Care;Hologic Inc.
+US4370761029;HD;Consumer Discretionary;Home Depot Inc.
+US4385161066;HON;Industrials;Honeywell International Inc.
+US4404521001;HRL;Consumer Staples;Hormel Foods Corporation
+US44107P1049;HST;Real Estate;Host Hotels & Resorts Inc.
+US4432011082;HWM;Industrials;Howmet Aerospace Inc.
+US4435731009;;;HubSpot Inc.
+US4435106079;HUBB;Industrials;Hubbell Incorporated
+US4448591028;HUM;Health Care;Humana Inc.
+US4461501045;HBAN;Financials;Huntington Bancshares Incorporated
+US4464131063;;;Huntington Ingalls Industries Inc.
+US4592001014;IBM;Information Technology;IBM Corporation
+US45167R1041;IEX;Industrials;IDEX Corporation
+US45168D1046;IDXX;Health Care;IDEXX Laboratories Inc.
+US44980X1090;;;IPG Photonics Corporation
+US46266C1053;IQV;Health Care;IQVIA Holdings Inc.
+US4523081093;ITW;Industrials;Illinois Tool Works Inc.
+US4523271090;;;Illumina Inc.
+US45256X1037;;;"Illumina; Inc."
+US45337C1027;INCY;Health Care;Incyte Corporation
+US45687V1061;IR;Industrials;Ingersoll Rand Inc.
+US45784P1012;PODD;Health Care;Insulet Corporation
+US4581401001;INTC;Information Technology;Intel Corporation
+US45866F1049;ICE;Financials;Intercontinental Exchange Inc.
+US4595061015;IFF;Materials;International Flavors & Fragrances Inc.
+US4601461035;IP;Materials;International Paper Company
+US4606901001;;;Interpublic Group of Companies Inc.
+US4612021034;INTU;Information Technology;Intuit Inc.
+US46120E6023;ISRG;Health Care;Intuitive Surgical Inc.
+US46187W1071;INVH;Real Estate;Invitation Homes Inc.
+US46284V1017;IRM;Real Estate;Iron Mountain Inc.
+US4456581077;;;J.B. Hunt Transport Services Inc.
+US8326964058;;;JM Smucker Company
+US46625H1005;JPM;Financials;JPMorgan Chase & Co.
+US4663131039;JBL;Information Technology;Jabil Inc.
+US4262811015;JKHY;Financials;Jack Henry & Associates Inc.
+US46982L1089;J;Industrials;Jacobs Solutions Inc.
+US4781601046;JNJ;Health Care;Johnson & Johnson
+US48203R1041;;;Juniper Networks Inc.
+US48251W1045;;;KKR & Co. Inc.
+US4824801009;KLAC;Information Technology;KLA Corporation
+US4878361082;K;Consumer Staples;Kellanova
+US49177J1025;KVUE;Consumer Staples;Kenvue Inc.
+US49271V1008;KDP;Consumer Staples;Keurig Dr Pepper Inc.
+US4932671088;KEY;Financials;KeyCorp
+US49338L1035;KEYS;Information Technology;Keysight Technologies Inc.
+US4943681035;KMB;Consumer Staples;Kimberly-Clark Corporation
+US49446R1095;KIM;Real Estate;Kimco Realty Corporation
+US49456B1017;KMI;Energy;Kinder Morgan Inc.
+US5007541064;KHC;Consumer Staples;Kraft Heinz Company
+US5010441013;KR;Consumer Staples;Kroger Company
+US5024311095;LHX;Industrials;L3Harris Technologies Inc.
+US5018892084;LKQ;Consumer Discretionary;LKQ Corporation
+US5049221055;;;Laboratory Corporation of America Holdings
+US5128071082;LRCX;Information Technology;Lam Research Corporation
+US5253271028;LDOS;Industrials;Leidos Holdings Inc.
+US5260571048;LEN;Consumer Discretionary;Lennar Corporation Class A
+US5261071071;;;Lennox International Inc.
+US5260573028;;;Levi Strauss & Co. Class A
+US5341871094;;;Lincoln National Corporation
+US5380341090;LYV;Communication Services;Live Nation Entertainment Inc.
+US5398301094;LMT;Industrials;Lockheed Martin Corporation
+US5404241086;L;Financials;Loews Corporation
+US5486611073;LOW;Consumer Discretionary;Lowe's Companies Inc.
+US55261F1049;MTB;Financials;M&T Bank Corporation
+US5529531015;;;MGM Resorts International
+US55354G1004;;;MSCI Inc.
+US56585A1025;MPC;Energy;Marathon Petroleum Corporation
+US57060D1081;MKTX;Financials;MarketAxess Holdings Inc.
+US5719032022;MAR;Consumer Discretionary;Marriott International Inc. Class A
+US5717481023;;;Marsh & McLennan Companies Inc.
+US5732841060;MLM;Materials;Martin Marietta Materials Inc.
+US5738741041;;;"Marvell Technology; Inc."
+US5745991068;MAS;Industrials;Masco Corporation
+US57636Q1040;MA;Financials;Mastercard Incorporated Class A
+US57667L1070;MTCH;Communication Services;Match Group Inc.
+US5797802064;MKC;Consumer Staples;McCormick & Company Incorporated
+US5801351017;MCD;Consumer Discretionary;McDonald's Corp.
+US58155Q1031;MCK;Health Care;McKesson Corporation
+US58733R1023;;;MercadoLibre Inc.
+US58933Y1055;MRK;Health Care;Merck & Co. Inc.
+US59156R1086;MET;Financials;MetLife Inc.
+US30303M1027;META;Communication Services;Meta Platforms Inc.
+US5926881054;;;Mettler-Toledo International Inc.
+US5950171042;MCHP;Information Technology;Microchip Technology Incorporated
+US5951121038;MU;Information Technology;Micron Technology Inc.
+US5949181045;MSFT;Information Technology;Microsoft Corporation
+US59522J1034;MAA;Real Estate;Mid-America Apartment Communities Inc.
+US60770K1079;MRNA;Health Care;Moderna Inc.
+US6081901042;MHK;Consumer Discretionary;Mohawk Industries Inc.
+US60855R1005;MOH;Health Care;Molina Healthcare Inc.
+US60871R2094;TAP;Consumer Staples;Molson Coors Beverage Company Class B
+US6092071058;MDLZ;Consumer Staples;Mondelez International Inc. Class A
+US6098391054;MPWR;Information Technology;Monolithic Power Systems Inc.
+US61174X1090;MNST;Consumer Staples;Monster Beverage Corporation
+US6153691059;MCO;Financials;Moody's Corporation
+US6174464486;MS;Financials;Morgan Stanley
+US61945C1036;MOS;Materials;Mosaic Company
+US6200763075;MSI;Information Technology;Motorola Solutions Inc.
+US6541061031;NKE;Consumer Discretionary;NIKE Inc.
+US6293775085;NRG;Utilities;NRG Energy Inc.
+US67066G1040;NVDA;Information Technology;NVIDIA Corporation
+US62944T1051;NVR;Consumer Discretionary;NVR Inc.
+US6311031081;NDAQ;Financials;Nasdaq Inc.
+US64110L1061;NFLX;Communication Services;Netflix Inc.
+US6516391066;NEM;Materials;Newmont Corporation
+US65249B1098;NWSA;Communication Services;News Corporation Class A
+US65249B1098;NWS;Communication Services;News Corporation Class A
+US65249B2087;NWSA;Communication Services;News Corporation Class B
+US65249B2087;NWS;Communication Services;News Corporation Class B
+US65339F1012;NEE;Utilities;NextEra Energy Inc.
+US65473P1057;NI;Utilities;Nisource Inc.
+US6558441084;NSC;Industrials;Norfolk Southern Corporation
+US6658591044;NTRS;Financials;Northern Trust Corporation
+US6668071029;NOC;Industrials;Northrop Grumman Corporation
+US6703461052;NUE;Materials;Nucor Corporation
+US67103H1077;ORLY;Consumer Discretionary;O'Reilly Automotive Inc.
+US6821891057;ON;Information Technology;ON Semiconductor Corporation
+US6826801036;OKE;Energy;ONEOK Inc.
+US6745991058;OXY;Energy;Occidental Petroleum Corporation
+US6795801009;ODFL;Industrials;Old Dominion Freight Line Inc.
+US6819191064;OMC;Communication Services;Omnicom Group Inc.
+US68389X1054;ORCL;Information Technology;Oracle Corporation
+US68622V1061;;;Organon & Co.
+US68902V1070;OTIS;Industrials;Otis Worldwide Corporation
+US6907421019;;;Owens Corning
+US6937181088;PCAR;Industrials;PACCAR Inc.
+US69331C1080;PCG;Utilities;PG&E Corporation
+US6934751057;PNC;Financials;PNC Financial Services Group Inc.
+US6935061076;PPG;Materials;PPG Industries Inc.
+US69351T1060;PPL;Utilities;PPL Corporation
+US69370C1009;PTC;Information Technology;PTC Inc.
+US6951561090;PKG;Materials;Packaging Corporation of America
+US69608A1088;;;Palantir Technologies Inc. Class A
+US6974351057;PANW;Information Technology;Palo Alto Networks Inc.
+US7010941042;PH;Industrials;Parker-Hannifin Corporation
+US70450Y1038;PYPL;Financials;PayPal Holdings Inc.
+US7043261079;PAYX;Industrials;Paychex Inc.
+US70432V1026;;;Paycom Software Inc.
+US7134481081;PEP;Consumer Staples;PepsiCo Inc.
+US7170811035;PFE;Health Care;Pfizer Inc.
+US7181721090;PM;Consumer Staples;Philip Morris International Inc.
+US7185461040;PSX;Energy;Phillips 66
+US7234841010;;;Pinnacle West Capital Corporation
+US73278L1052;POOL;Consumer Discretionary;Pool Corporation
+US74251V1026;PFG;Financials;Principal Financial Group Inc.
+US7427181091;PG;Consumer Staples;Procter & Gamble Co.
+US7433151039;PGR;Financials;Progressive Corporation
+US74340W1036;PLD;Real Estate;Prologis Inc.
+US7443201022;PRU;Financials;Prudential Financial Inc.
+US7445731067;PEG;Utilities;Public Service Enterprise Group Incorporated
+US74460D1090;PSA;Real Estate;Public Storage
+US7458671010;PHM;Consumer Discretionary;PulteGroup Inc.
+US7475251036;QCOM;Information Technology;QUALCOMM Incorporated
+US74736K1016;QRVO;Information Technology;Qorvo Inc.
+US74762E1029;PWR;Industrials;Quanta Services Inc.
+US74834L1008;DGX;Health Care;Quest Diagnostics Incorporated
+US75513E1010;RTX;Industrials;RTX Corporation
+US7547301090;RJF;Financials;Raymond James Financial Inc.
+US7561091049;O;Real Estate;Realty Income Corporation
+US75886F1075;REGN;Health Care;Regeneron Pharmaceuticals Inc.
+US7591EP1005;RF;Financials;Regions Financial Corporation
+US7607591002;RSG;Industrials;Republic Services Inc.
+US7140461093;RVTY;Health Care;Revvity Inc.
+US7703231032;;;Robert Half Inc.
+US7739031091;ROK;Industrials;Rockwell Automation Inc.
+US7757111049;ROL;Industrials;Rollins Inc.
+US7766961061;ROP;Information Technology;Roper Technologies Inc.
+US7782961038;ROST;Consumer Discretionary;Ross Stores Inc.
+US78409V1044;SPGI;Financials;S&P Global Inc.
+US78410G1040;SBAC;Real Estate;SBA Communications Corporation Class A
+US79466L3024;CRM;Information Technology;Salesforce Inc.
+US8068571086;SLB;Energy;Schlumberger N.V.
+US8168511090;SRE;Utilities;Sempra
+US81762P1021;NOW;Information Technology;ServiceNow Inc.
+US81762P1021;NOW;Information Technology;ServiceNow Inc.
+US8243481061;SHW;Materials;Sherwin-Williams Co.
+US8288061091;SPG;Real Estate;Simon Property Group Inc.
+US83088M1027;SWKS;Information Technology;Skyworks Solutions Inc.
+US8330341012;SNA;Industrials;Snap-on Incorporated
+US83444M1018;SOLV;Health Care;Solventum Corporation
+US8425871071;SO;Utilities;Southern Company
+US8447411088;LUV;Industrials;Southwest Airlines Co.
+US8545021011;SWK;Industrials;Stanley Black & Decker Inc.
+US8552441094;SBUX;Consumer Discretionary;Starbucks Corporation
+US8574771031;STT;Financials;State Street Corporation
+US8581191009;STLD;Materials;Steel Dynamics Inc.
+US8636671013;SYK;Health Care;Stryker Corporation
+US86800U1043;SMCI;Information Technology;Super Micro Computer Inc.
+US87165B1035;SYF;Financials;Synchrony Financial
+US8716071076;SNPS;Information Technology;Synopsys Inc.
+US8718291078;SYY;Consumer Staples;Sysco Corporation
+US8725901040;TMUS;Communication Services;T-Mobile US Inc.
+US74144T1088;TROW;Financials;T. Rowe Price Group Inc.
+US8725401090;TJX;Consumer Discretionary;TJX Companies Inc.
+US87256C1018;;;TKO Group Holdings Inc.
+US8760301072;TPR;Consumer Discretionary;Tapestry Inc.
+US87612G1013;TRGP;Energy;Targa Resources Corp.
+US87612E1064;TGT;Consumer Staples;Target Corporation
+US8793601050;TDY;Information Technology;Teledyne Technologies Incorporated
+US8793691069;TFX;Health Care;Teleflex Incorporated
+US8807701029;TER;Information Technology;Teradyne Inc.
+US88160R1014;TSLA;Consumer Discretionary;Tesla Inc.
+US8825081040;TXN;Information Technology;Texas Instruments Incorporated
+US88262P1021;TPL;Energy;Texas Pacific Land Corporation
+US8832031012;TXT;Industrials;Textron Inc.
+US1255231003;CI;Health Care;The Cigna Group
+US2546871060;DIS;Communication Services;The Walt Disney Company
+US8835561023;TMO;Health Care;Thermo Fisher Scientific Inc.
+US8923561067;TSCO;Consumer Discretionary;Tractor Supply Company
+US88339J1051;;;Trade Desk Inc. Class A
+US8936411003;TDG;Industrials;TransDigm Group Incorporated
+US89417E1091;TRV;Financials;Travelers Companies Inc.
+US8962391004;TRMB;Information Technology;Trimble Inc.
+US89832Q1094;TFC;Financials;Truist Financial Corporation
+US9022521051;TYL;Information Technology;Tyler Technologies Inc.
+US9024941034;TSN;Consumer Staples;Tyson Foods Inc. Class A
+US9029733048;USB;Financials;U.S. Bancorp
+US90353T1007;UBER;Industrials;Uber Technologies Inc.
+US90384S3031;ULTA;Consumer Discretionary;Ulta Beauty Inc.
+US9078181081;UNP;Industrials;Union Pacific Corporation
+US9100471096;UAL;Industrials;United Airlines Holdings Inc.
+US9113121068;UPS;Industrials;United Parcel Service Inc. Class B
+US9113631090;URI;Industrials;United Rentals Inc.
+US91307C1027;;;United Therapeutics Corporation
+US91324P1021;UNH;Health Care;UnitedHealth Group Inc.
+US91529Y1064;;;Unum Group
+US9256521090;VICI;Real Estate;VICI Properties Inc.
+US91913Y1001;VLO;Energy;Valero Energy Corporation
+US92276F1003;VTR;Real Estate;Ventas Inc.
+US92338C1036;VLTO;Industrials;Veralto Corporation
+US92345Y1064;VRSK;Industrials;Verisk Analytics Inc.
+US92343V1044;VZ;Communication Services;Verizon Communications Inc.
+US92532F1003;VRTX;Health Care;Vertex Pharmaceuticals Incorporated
+US92556V1061;VTRS;Health Care;Viatris Inc.
+US92826C8394;V;Financials;Visa Inc.
+US9291601097;VMC;Materials;Vulcan Materials Company
+US0844231029;WRB;Financials;W. R. Berkley Corporation
+US3848021040;GWW;Industrials;W.W. Grainger Inc.
+US92939U1060;WEC;Utilities;WEC Energy Group Inc.
+US9314271084;WBA;Consumer Staples;Walgreens Boots Alliance Inc.
+US94106L1026;WMT;Consumer Staples;Walmart Inc.
+US9344231041;WBD;Communication Services;Warner Bros. Discovery Inc.
+US94106L1098;WM;Industrials;Waste Management Inc.
+US9418481035;WAT;Health Care;Waters Corporation
+US9497461015;WFC;Financials;Wells Fargo & Company
+US95040Q1040;WELL;Real Estate;Welltower Inc.
+US9553061055;WST;Health Care;West Pharmaceutical Services Inc.
+US96145D1054;;;WestRock Company
+US9581021055;WDC;Information Technology;Western Digital Corporation
+US9297401088;;;Westinghouse Air Brake Technologies Corporation
+US9621661043;WY;Real Estate;Weyerhaeuser Company
+US9694571004;WMB;Energy;Williams Companies Inc.
+US9699041011;WSM;Consumer Discretionary;Williams-Sonoma Inc.
+US98138H1014;WDAY;Information Technology;Workday Inc. Class A
+US9831341071;;;Wynn Resorts Limited
+US98389B1008;XEL;Utilities;Xcel Energy Inc.
+US98419M1009;XYL;Industrials;Xylem Inc.
+US9884981013;YUM;Consumer Discretionary;Yum! Brands Inc.
+US9892071054;ZBRA;Information Technology;Zebra Technologies Corporation Class A
+US98956P1021;ZBH;Health Care;Zimmer Biomet Holdings Inc.
+US98978V1035;ZTS;Health Care;Zoetis Inc. Class A
+US98980G1022;;;Zscaler Inc.
+US2786421030;EBAY;Consumer Discretionary;eBay Inc.
