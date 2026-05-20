@@ -53,13 +53,15 @@ Place one or more broker CSV files in the project root or a `depot/` subfolder. 
 
 | Broker | Format | Key columns |
 |---|---|---|
-| Smartbroker | `;`-separated | `ISIN`, `ASSETKLASSE`, `Bezeichnung` |
+| Smartbroker | `;`-separated | `ISIN`, `WKN`, `ASSETKLASSE`, `Bezeichnung` |
 | Trade Republic | `;`-separated | `ISIN`, `Name`, `Stücke` |
 | ISIN reference | `;`-separated | `ISIN`, `Name` |
-| Legacy | `,`-separated | `Ticker`, `Name` |
+| Ticker list | `,`-separated | `Ticker`, `Name` (or `Unternehmen`) |
+
+> **WKN support:** Smartbroker exports include a `WKN` column. The screener uses WKN codes as a priority lookup hint (before ISIN) because Yahoo Finance resolves German stocks more reliably via WKN.
 
 Sample files are included in `depot/`:
-- `DAX40.csv` — DAX 40 constituents (ISIN format)
+- `DAX40.csv` — DAX 40 constituents with direct tickers (`Ticker`, `Unternehmen`, `ISIN`, `WKN`)
 - `USstocks.csv` — US large-cap selection (ISIN format)
 
 ### Option B — Named depots (`depot_config.json`)

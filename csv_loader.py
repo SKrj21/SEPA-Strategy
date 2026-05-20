@@ -159,7 +159,7 @@ def load_csv_name_map(path: Path) -> dict[str, str]:
 
         if fmt in ("smartbroker", "trade_republic", "reference"):
             isin_col = _find_col(df, "ISIN")
-            name_col = _find_col(df, "Bezeichnung", "Name", "Wertpapier", "Firma", "Titel")
+            name_col = _find_col(df, "Bezeichnung", "Name", "Wertpapier", "Unternehmen", "Firma", "Titel")
             if isin_col and name_col:
                 for _, row in df.iterrows():
                     isin = str(row[isin_col]).strip().upper()
@@ -169,7 +169,7 @@ def load_csv_name_map(path: Path) -> dict[str, str]:
 
         elif fmt == "legacy":
             ticker_col = _find_col(df, "Ticker", "TICKER", "Symbol", "SYMBOL")
-            name_col = _find_col(df, "Name", "Company", "Bezeichnung", "Firma", "Titel")
+            name_col = _find_col(df, "Name", "Company", "Bezeichnung", "Unternehmen", "Firma", "Titel")
             if ticker_col and name_col:
                 for _, row in df.iterrows():
                     ticker = str(row[ticker_col]).strip().upper()
