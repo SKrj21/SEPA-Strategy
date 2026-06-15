@@ -22,7 +22,7 @@ def _download_with_fallback(ticker: str) -> pd.DataFrame | None:
         candidates.append("-".join(parts))
     for sym in candidates:
         try:
-            df = yfinance.download(sym, period="2y", interval="1d", auto_adjust=True, progress=False)
+            df = yfinance.download(sym, period="2y", interval="1d", auto_adjust=False, progress=False)
             if not df.empty:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
@@ -73,7 +73,7 @@ def fetch_ticker_names(tickers: tuple[str, ...]) -> dict[str, str]:
 @st.cache_data(ttl=3600)
 def fetch_spy_benchmark() -> pd.DataFrame:
     try:
-        df = yfinance.download("SPY", period="2y", interval="1d", auto_adjust=True, progress=False)
+        df = yfinance.download("SPY", period="2y", interval="1d", auto_adjust=False, progress=False)
         if df.empty:
             st.warning("Could not fetch SPY benchmark data.")
             return df

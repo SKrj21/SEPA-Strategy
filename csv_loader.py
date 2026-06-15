@@ -5,7 +5,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-_EXCLUDE_FILES = {"sepa_results.csv", "isin_cache.csv"}  # isin_cache.csv excluded to prevent circular ISIN re-ingestion
+_EXCLUDE_FILES = {"sepa_results.csv", "isin_cache.csv", "manual_ticker_map.csv"}
 
 
 # ── Format detection ──────────────────────────────────────────────────────────
@@ -146,6 +146,70 @@ def load_csv_isin_wkn_map(path: Path) -> dict[str, str]:
         return {}
 
 
+def load_csv_isin_hints_map(path: Path) -> dict[str, dict]:
+    """Return {ISIN: {"wkn": str, "kuerzel": str, "name": str, "einstand": float}} for Smartbroker CSVs.
+
+    Combines WKN, Kürzel (direct ticker hint), Bezeichnung, and Einstandskurs (purchase
+    price) into one call. einstand is used to compute P&L in the depot view.
+    Returns an empty dict for formats without an ISIN column.
+    """
+    try:
+        df = _try_read(path)
+        df.columns = [c.strip() for c in df.columns]
+        fmt = _detect_format(list(df.columns))
+        if fmt != "smartbroker":
+            return {}
+        isin_col     = _find_col(df, "ISIN")
+        wkn_col      = _find_col(df, "WKN", "Wkn", "wkn")
+        kuerzel_col  = _find_col(df, "Kürzel", "Kuerzel", "kuerzel", "KÜRZEL", "KUERZEL")
+        name_col     = _find_col(df, "Bezeichnung", "Name", "Wertpapier", "Unternehmen", "Firma")
+        # Einstandskurs: match any column that starts with "einstandskurs" (catches
+        # "Einstandskurs in EUR", "Einstandskurs (EUR)", etc.)
+        upper_cols = {c.strip().upper(): c for c in df.columns}
+        einstand_col = next(
+            (orig for up, orig in upper_cols.items() if up.startswith("EINSTANDSKURS")),
+            _find_col(df, "Einstand", "Kaufkurs", "Avg. Cost"),
+        )
+        if not isin_col:
+            return {}
+        result: dict[str, dict] = {}
+        for _, row in df.iterrows():
+            isin = str(row[isin_col]).strip().upper()
+            if not _is_valid_isin(isin):
+                continue
+            hints: dict = {}
+            if wkn_col:
+                v = str(row[wkn_col]).strip()
+                if v and v.lower() != "nan":
+                    hints["wkn"] = v
+            if kuerzel_col:
+                v = str(row[kuerzel_col]).strip()
+                if v and v.lower() != "nan":
+                    hints["kuerzel"] = v
+            if name_col:
+                v = str(row[name_col]).strip()
+                if v and v.lower() != "nan":
+                    hints["name"] = v
+            if einstand_col:
+                raw = str(row[einstand_col]).strip()
+                # Parse German decimal format: "1.234,56" → 1234.56
+                if "," in raw and "." in raw:
+                    raw = raw.replace(".", "").replace(",", ".")
+                else:
+                    raw = raw.replace(",", ".")
+                try:
+                    val = float(raw)
+                    if val > 0:
+                        hints["einstand"] = val
+                except (ValueError, TypeError):
+                    pass
+            if hints:
+                result[isin] = hints
+        return result
+    except Exception:
+        return {}
+
+
 def load_csv_name_map(path: Path) -> dict[str, str]:
     """Return {isin_or_ticker: display_name} from a broker CSV.
 
@@ -200,8 +264,11 @@ def discover_csv_files(base_dir: Path) -> dict[str, list[str]]:
         try:
             entries = load_csv_file(path)
             if entries:
-                results[path.name] = entries
-                logger.info("Discovered %d entries in %s", len(entries), path.name)
+                # Use path relative to base_dir so callers can reconstruct the
+                # full path via base_dir / rel_path (handles files in subdirs).
+                rel = str(path.relative_to(base_dir))
+                results[rel] = entries
+                logger.info("Discovered %d entries in %s", len(entries), rel)
         except Exception as exc:
             logger.warning("Skipping %s: %s", path.name, exc)
 

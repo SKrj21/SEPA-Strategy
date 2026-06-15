@@ -5,9 +5,10 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+import yfinance as yf
 
 from charts import build_detail_chart
-from csv_loader import discover_csv_files, load_csv_file, load_csv_isin_wkn_map, load_csv_name_map
+from csv_loader import discover_csv_files, load_csv_file, load_csv_isin_hints_map, load_csv_isin_wkn_map, load_csv_name_map
 from data_fetcher import fetch_ohlcv, fetch_single_ohlcv, fetch_spy_benchmark, fetch_ticker_names
 from indicators import compute_indicators
 from isin_resolver import resolve_isin
@@ -16,6 +17,63 @@ from screener import run_full_screen
 
 APP_DIR = Path(__file__).parent
 DEPOT_CONFIG_PATH = APP_DIR / "depot_config.json"
+
+# ── FX helpers (mirrors sepa_scanner approach) ────────────────────────────────
+# Module-level caches survive across Streamlit reruns within the same process.
+_currency_cache: dict[str, str] = {}
+_fx_rate_cache:  dict[str, float] = {}
+
+def _get_ticker_currency(symbol: str) -> str:
+    """Return the trading currency for a ticker using yfinance fast_info, with symbol-suffix fallback."""
+    if symbol in _currency_cache:
+        return _currency_cache[symbol]
+    try:
+        ccy = getattr(yf.Ticker(symbol).fast_info, "currency", None)
+        if ccy:
+            _currency_cache[symbol] = str(ccy).upper()
+            return _currency_cache[symbol]
+    except Exception:
+        pass
+    sym = symbol.upper()
+    if any(sym.endswith(s) for s in (".DE", ".F", ".HM", ".BE", ".MU", ".SG",
+                                      ".PA", ".MI", ".AS", ".BR", ".MC", ".LS",
+                                      ".VI", ".HE", ".IR")):
+        ccy = "EUR"
+    elif sym.endswith(".L"):  ccy = "GBP"
+    elif sym.endswith(".SW"): ccy = "CHF"
+    elif sym.endswith(".ST"): ccy = "SEK"
+    elif sym.endswith(".CO"): ccy = "DKK"
+    elif sym.endswith(".OL"): ccy = "NOK"
+    elif sym.endswith(".TO") or sym.endswith(".V"): ccy = "CAD"
+    elif sym.endswith(".AX"): ccy = "AUD"
+    elif sym.endswith(".T"):  ccy = "JPY"
+    elif sym.endswith(".HK"): ccy = "HKD"
+    elif sym.endswith(".SI"): ccy = "SGD"
+    elif "." not in sym:      ccy = "USD"
+    else:                     ccy = "EUR"
+    _currency_cache[symbol] = ccy
+    return ccy
+
+
+def _get_fx_rate(from_ccy: str, to_ccy: str = "EUR") -> float:
+    """Return exchange rate from_ccy → to_ccy. Cached; returns 1.0 on failure."""
+    from_ccy = from_ccy.upper()
+    to_ccy   = to_ccy.upper()
+    if from_ccy == to_ccy:
+        return 1.0
+    key = f"{from_ccy}{to_ccy}"
+    if key in _fx_rate_cache:
+        return _fx_rate_cache[key]
+    try:
+        hist = yf.Ticker(f"{key}=X").history(period="2d", auto_adjust=False)
+        if hist is not None and not hist.empty:
+            rate = float(hist["Close"].iloc[-1])
+            _fx_rate_cache[key] = rate
+            return rate
+    except Exception:
+        pass
+    _fx_rate_cache[key] = 1.0
+    return 1.0
 
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -128,12 +186,12 @@ def _names_from_depot_def(depot_def: dict) -> dict[str, str]:
     return name_map
 
 
-def _wkn_from_depot_def(depot_def: dict) -> dict[str, str]:
-    """Build {ISIN: WKN} from all files in a depot definition (Smartbroker only)."""
-    wkn_map: dict[str, str] = {}
+def _hints_from_depot_def(depot_def: dict) -> dict[str, dict]:
+    """Build {ISIN: {wkn, kuerzel, name}} hints from all files in a depot definition."""
+    hints: dict[str, dict] = {}
     for fname in depot_def.get("files", []):
-        wkn_map.update(load_csv_isin_wkn_map(APP_DIR / fname))
-    return wkn_map
+        hints.update(load_csv_isin_hints_map(APP_DIR / fname))
+    return hints
 
 
 def _build_ticker_to_name(isin_map: dict[str, str], raw_tickers: list[str], isin_name_map: dict[str, str]) -> dict[str, str]:
@@ -151,7 +209,7 @@ def _build_ticker_to_name(isin_map: dict[str, str], raw_tickers: list[str], isin
 def _resolve_entries(
     depot_name: str,
     entries: list[str],
-    wkn_map: dict[str, str] | None = None,
+    hints_map: dict[str, dict] | None = None,
 ) -> tuple[list[str], list[str], dict[str, str]]:
     """Resolve ISINs to ticker symbols; returns (tickers, failed_isins, isin_to_ticker)."""
     key_t = f"depot_{depot_name}_tickers"
@@ -166,12 +224,18 @@ def _resolve_entries(
     raw_tickers = [e for e in entries if not (len(e) == 12 and e[:2].isalpha())]
     resolved: dict[str, str] = {}
     failed: list[str] = []
-    _wkn = wkn_map or {}
+    _hints = hints_map or {}
 
     if raw_isins:
         prog = st.progress(0, text=f"Resolving ISINs for {depot_name}…")
         for i, isin in enumerate(raw_isins):
-            ticker = resolve_isin(isin, wkn_hint=_wkn.get(isin))
+            h = _hints.get(isin, {})
+            ticker = resolve_isin(
+                isin,
+                wkn_hint=h.get("wkn"),
+                ticker_hint=h.get("kuerzel"),
+                name_hint=h.get("name"),
+            )
             if ticker:
                 resolved[isin] = ticker
             else:
@@ -199,11 +263,11 @@ if depot_config:
         name = depot_def.get("name", "Depot")
         entries = _entries_from_depot_def(depot_def)
         isin_name_map = _names_from_depot_def(depot_def)
-        wkn_map = _wkn_from_depot_def(depot_def)
-        tickers, failed, isin_map = _resolve_entries(name, entries, wkn_map=wkn_map)
+        hints_map = _hints_from_depot_def(depot_def)
+        tickers, failed, isin_map = _resolve_entries(name, entries, hints_map=hints_map)
         raw_t = [e for e in entries if not (len(e) == 12 and e[:2].isalpha())]
         ticker_to_name = _build_ticker_to_name(isin_map, raw_t, isin_name_map)
-        depots.append({"name": name, "tickers": tickers, "failed_isins": failed, "isin_map": isin_map, "ticker_to_name": ticker_to_name})
+        depots.append({"name": name, "tickers": tickers, "failed_isins": failed, "isin_map": isin_map, "ticker_to_name": ticker_to_name, "_hints_map": hints_map})
         with st.sidebar:
             st.caption(f"📁 {name}: {len(tickers)} tickers")
 
@@ -228,9 +292,9 @@ else:
     # Separate ISINs from legacy tickers across all discovered files
     raw_isins: list[str] = []
     raw_tickers: list[str] = []
-    _global_wkn_map: dict[str, str] = {}
+    _global_hints_map: dict[str, dict] = {}
     for _fname, _entries in discovered.items():
-        _global_wkn_map.update(load_csv_isin_wkn_map(APP_DIR / _fname))
+        _global_hints_map.update(load_csv_isin_hints_map(APP_DIR / _fname))
         for e in _entries:
             e = e.strip().upper()
             if len(e) == 12 and e[:2].isalpha():
@@ -250,7 +314,8 @@ else:
         resolved_map: dict[str, str] = {}
         failed_isins: list[str] = []
         for i, isin in enumerate(raw_isins):
-            ticker = resolve_isin(isin, wkn_hint=_global_wkn_map.get(isin))
+            _h = _global_hints_map.get(isin, {})
+            ticker = resolve_isin(isin, wkn_hint=_h.get("wkn"), ticker_hint=_h.get("kuerzel"), name_hint=_h.get("name"))
             if ticker:
                 resolved_map[isin] = ticker
             else:
@@ -286,12 +351,14 @@ else:
             _tickers = list(dict.fromkeys(list(_file_resolved.values()) + _file_tickers))
             _isin_name_map = load_csv_name_map(APP_DIR / _fname)
             _ticker_to_name = _build_ticker_to_name(_file_resolved, _file_tickers, _isin_name_map)
+            _file_hints = {isin: _global_hints_map[isin] for isin in _file_isins if isin in _global_hints_map}
             depots.append({
                 "name": _depot_name,
                 "tickers": _tickers,
                 "failed_isins": _file_failed,
                 "isin_map": _file_resolved,
                 "ticker_to_name": _ticker_to_name,
+                "_hints_map": _file_hints,
             })
     else:
         depots = [{
@@ -407,7 +474,8 @@ for d in depots:
         continue
     for old_ticker in _failed:
         isin = _reverse_isin[old_ticker]
-        new_ticker = resolve_isin(isin, force=True)
+        _rh = d.get("_hints_map", {}).get(isin, {})
+        new_ticker = resolve_isin(isin, wkn_hint=_rh.get("wkn"), ticker_hint=_rh.get("kuerzel"), name_hint=_rh.get("name"), force=True)
         if new_ticker and new_ticker != old_ticker and new_ticker not in ohlcv_data:
             df = fetch_single_ohlcv(new_ticker)
             if df is not None:
@@ -445,6 +513,9 @@ for idx, depot in enumerate(depots):
         )
     else:
         results, excluded = [], []
+    # Build reverse map ticker→ISIN for P&L calculation (done once per depot)
+    _rev_isin = {t: isin for isin, t in depot["isin_map"].items()}
+    _hints    = depot.get("_hints_map", {})
     for i, row in enumerate(results):
         try:
             row["Signal"] = classify_signal(row)
@@ -680,6 +751,22 @@ for i, depot in enumerate(depots):
             "Neutral": "🟡", "Warning": "🟠", "Chronic": "⚫", "Sell-Panic": "🔴",
         }
         from classifier import SIGNAL_ORDER as _SO_d
+
+        # Build P&L lookup for this depot: ticker → P&L%
+        # Smartbroker einstand is always in EUR. yfinance prices are in the
+        # stock's native currency. Convert via FX rate before comparing.
+        _d_rev_isin = {t: isin for isin, t in depot["isin_map"].items()}
+        _d_hints    = depot.get("_hints_map", {})
+        def _pl_pct(ticker: str, price) -> float | None:
+            isin = _d_rev_isin.get(ticker)
+            if not isin:
+                return None
+            einstand = _d_hints.get(isin, {}).get("einstand")
+            if not einstand or not price or einstand <= 0:
+                return None
+            ccy = _get_ticker_currency(ticker)
+            price_eur = price * _get_fx_rate(ccy)
+            return round((price_eur / einstand - 1) * 100, 1)
         _tier_tab_labels = ["📋 All Results"] + [f"{_TIER_ICONS.get(t, '')} {t}" for t in _SO_d] + ["📊 Detail Chart"]
         _all_sub, *_tier_tabs, _chart_sub = st.tabs(_tier_tab_labels)
         sub_chart = _chart_sub
@@ -699,6 +786,8 @@ for i, depot in enumerate(depots):
                 key=_gk("dl_depot_all"),
             )
 
+        _LOSS_TIERS = {"Warning", "Chronic", "Sell-Panic"}
+
         for _tier, _tier_tab in zip(_SO_d, _tier_tabs):
             with _tier_tab:
                 _tier_rows = sorted(
@@ -707,7 +796,30 @@ for i, depot in enumerate(depots):
                     reverse=(_tier != "Sell-Panic"),
                 )
                 if _tier_rows:
-                    st.dataframe(_styled(_tier_rows), width='stretch')
+                    if _tier in _LOSS_TIERS:
+                        # Replace Score with P&L % for loss tiers
+                        _display_rows = []
+                        for _r in _tier_rows:
+                            _pv = _pl_pct(_r["Ticker"], _r.get("Price"))
+                            _row_copy = {k: v for k, v in _r.items() if k != "Score"}
+                            _row_copy["P&L %"] = _pv  # None when not available
+                            _display_rows.append(_row_copy)
+                        # Sort worst P&L first (None values last)
+                        _display_rows.sort(
+                            key=lambda r: (r.get("P&L %") is None, r.get("P&L %") or 0)
+                        )
+                        _styled_loss = _styled(_display_rows)
+                        # Colour P&L % column
+                        if "P&L %" in pd.DataFrame(_display_rows).columns:
+                            _styled_loss = _styled_loss.map(
+                                lambda v: ("color: #dc3545; font-weight: bold" if isinstance(v, (int, float)) and v < 0
+                                           else "color: #198754; font-weight: bold" if isinstance(v, (int, float))
+                                           else ""),
+                                subset=["P&L %"],
+                            )
+                        st.dataframe(_styled_loss, width='stretch')
+                    else:
+                        st.dataframe(_styled(_tier_rows), width='stretch')
                     st.download_button(
                         "⬇ Download CSV",
                         pd.DataFrame(_tier_rows).to_csv(index=False).encode("utf-8"),
@@ -736,6 +848,6 @@ for i, depot in enumerate(depots):
                 df_sel = ohlcv_data[selected]
                 ind_sel = compute_indicators(df_sel)
                 fig = build_detail_chart(df_sel, ind_sel, spy_df)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True, key=_gk("plotly_chart"))
             else:
                 st.warning(f"No price data available for {selected}.")
