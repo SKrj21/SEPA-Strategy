@@ -137,7 +137,7 @@ with st.sidebar:
     if _HAS_AUTOREFRESH:
         refresh_mins = st.number_input(
             "Auto-refresh (minutes, 0 = off)",
-            min_value=0, max_value=60, value=0, step=5,
+            min_value=0, max_value=120, value=60, step=5,
             key=_gk("refresh_input"),
         )
         if refresh_mins > 0:
@@ -521,7 +521,7 @@ for idx, depot in enumerate(depots):
             row["Signal"] = classify_signal(row)
         except ValueError:
             row["Signal"] = "Sell-Panic"
-        row["Score"] = row.get("RS Rating")
+
         name = _global_ticker_to_name.get(row.get("Ticker", ""), "")
         results[i] = {"Ticker": row["Ticker"], "Name": name, **{k: v for k, v in row.items() if k not in ("Ticker", "Name")}}
     depot_results.append((results, excluded))
@@ -562,8 +562,9 @@ def _signal_colour(val):
 def _styled(rows: list[dict]):
     df = pd.DataFrame(rows)
     df = df.drop(columns=["SEPA Pass"], errors="ignore")
-    if "Score" in df.columns:
-        df = df.sort_values("Score", ascending=False, na_position="last")
+    if "RS Rating" in df.columns:
+        df = df.sort_values("RS Rating", ascending=False, na_position="last")
+        df["RS Rating"] = df["RS Rating"].apply(lambda v: f"{v:.2f}%" if pd.notna(v) else "")
     present_bool = [c for c in _BOOL_COLS if c in df.columns]
     styler = df.style
     apply_fn = getattr(styler, "map", None) or styler.applymap
@@ -579,23 +580,23 @@ def _build_depot_summary(depots: list[dict], depot_results: list) -> list[dict]:
     rows = []
     for depot, (results, excluded) in zip(depots, depot_results):
         counts = {tier: sum(1 for r in results if r.get("Signal") == tier) for tier in _SO}
-        scores = [r["Score"] for r in results if r.get("Score") is not None]
+        scores = [r["RS Rating"] for r in results if r.get("RS Rating") is not None]
         rows.append({
             "Depot": depot["name"],
             "Stocks": len(results),
-            "Score Ø": round(sum(scores) / len(scores), 1) if scores else None,
+            "RS Ø": round(sum(scores) / len(scores), 1) if scores else None,
             **{tier: counts[tier] for tier in _SO},
             "Errors": len(excluded),
         })
     if len(rows) > 1:
         totals: dict = {"Depot": "GESAMT", "Stocks": sum(r["Stocks"] for r in rows)}
         all_scores_flat = [
-            r["Score"]
+            r["RS Rating"]
             for results, _ in depot_results
             for r in results
-            if r.get("Score") is not None
+            if r.get("RS Rating") is not None
         ]
-        totals["Score Ø"] = round(sum(all_scores_flat) / len(all_scores_flat), 1) if all_scores_flat else None
+        totals["RS Ø"] = round(sum(all_scores_flat) / len(all_scores_flat), 1) if all_scores_flat else None
         for tier in _SO:
             totals[tier] = sum(r[tier] for r in rows)
         totals["Errors"] = sum(r["Errors"] for r in rows)
@@ -657,19 +658,26 @@ with tabs[0]:
         for r in results
         if r.get("Signal") == "Buy"
     ]
+    all_sell_panic = [
+        {**r, "Depot": depots[i]["name"]}
+        for i, (results, _) in enumerate(depot_results)
+        for r in results
+        if r.get("Signal") == "Sell-Panic"
+    ]
     all_results_flat = [
         {**r, "Depot": depots[i]["name"]}
         for i, (results, _) in enumerate(depot_results)
         for r in results
     ]
 
-    ov_c1, ov_c2, ov_c3, ov_c4 = st.columns(4)
+    ov_c1, ov_c2, ov_c3, ov_c4, ov_c5 = st.columns(5)
     ov_c1.metric("Depots", len(depots))
     ov_c2.metric("Tickers screened", len(all_results_flat))
     ov_c3.metric("Buy signals", len(all_buy_signals))
+    ov_c4.metric("Sell-Panic", len(all_sell_panic))
     total_excl = sum(len(e) for _, e in depot_results)
     if total_excl:
-        ov_c4.metric("Excluded (data)", total_excl)
+        ov_c5.metric("Excluded (data)", total_excl)
 
     # Sound alert when new buy signals appear since last scan
     prev_buy = st.session_state.get("screen_prev_buy_count", -1)
@@ -691,8 +699,8 @@ with tabs[0]:
         st.subheader("Buy Signals (all depots)")
         st.dataframe(_styled(all_buy_signals), width='stretch')
         buy_dl_df = pd.DataFrame(all_buy_signals).drop(columns=["SEPA Pass"], errors="ignore")
-        if "Score" in buy_dl_df.columns:
-            buy_dl_df = buy_dl_df.sort_values("Score", ascending=False, na_position="last")
+        if "RS Rating" in buy_dl_df.columns:
+            buy_dl_df = buy_dl_df.sort_values("RS Rating", ascending=False, na_position="last")
         st.download_button(
             "⬇ Download buy signals CSV",
             buy_dl_df.to_csv(index=False).encode("utf-8"),
@@ -703,12 +711,26 @@ with tabs[0]:
     else:
         st.info("No buy signals found across all depots.")
 
+    if all_sell_panic:
+        st.subheader("Sell-Panic Signals (all depots)")
+        st.dataframe(_styled(all_sell_panic), width='stretch')
+        sp_dl_df = pd.DataFrame(all_sell_panic).drop(columns=["SEPA Pass"], errors="ignore")
+        if "RS Rating" in sp_dl_df.columns:
+            sp_dl_df = sp_dl_df.sort_values("RS Rating", ascending=True, na_position="last")
+        st.download_button(
+            "⬇ Download sell-panic signals CSV",
+            sp_dl_df.to_csv(index=False).encode("utf-8"),
+            "sell_panic_signals.csv",
+            "text/csv",
+            key=_gk("dl_overview_sell_panic"),
+        )
+
     if all_results_flat:
         with st.expander("All results (all depots)"):
             st.dataframe(_styled(all_results_flat), width='stretch')
             all_dl_df = pd.DataFrame(all_results_flat).drop(columns=["SEPA Pass"], errors="ignore")
-            if "Score" in all_dl_df.columns:
-                all_dl_df = all_dl_df.sort_values("Score", ascending=False, na_position="last")
+            if "RS Rating" in all_dl_df.columns:
+                all_dl_df = all_dl_df.sort_values("RS Rating", ascending=False, na_position="last")
             st.download_button(
                 "⬇ Download full CSV",
                 all_dl_df.to_csv(index=False).encode("utf-8"),
@@ -775,7 +797,7 @@ for i, depot in enumerate(depots):
             sorted_results = sorted(
                 results,
                 key=lambda r: (_SO_d.index(r["Signal"]) if r.get("Signal") in _SO_d else len(_SO_d),
-                               -(r.get("Score") or 0)),
+                               -(r.get("RS Rating") or 0)),
             )
             st.dataframe(_styled(sorted_results), width='stretch')
             st.download_button(
@@ -792,7 +814,7 @@ for i, depot in enumerate(depots):
             with _tier_tab:
                 _tier_rows = sorted(
                     [r for r in results if r.get("Signal") == _tier],
-                    key=lambda r: r.get("Score") or 0,
+                    key=lambda r: r.get("RS Rating") or 0,
                     reverse=(_tier != "Sell-Panic"),
                 )
                 if _tier_rows:
@@ -801,7 +823,7 @@ for i, depot in enumerate(depots):
                         _display_rows = []
                         for _r in _tier_rows:
                             _pv = _pl_pct(_r["Ticker"], _r.get("Price"))
-                            _row_copy = {k: v for k, v in _r.items() if k != "Score"}
+                            _row_copy = dict(_r)
                             _row_copy["P&L %"] = _pv  # None when not available
                             _display_rows.append(_row_copy)
                         # Sort worst P&L first (None values last)
@@ -834,7 +856,7 @@ for i, depot in enumerate(depots):
             ticker_options = [r["Ticker"] for r in results]
             buy_sorted = sorted(
                 [r for r in results if r.get("Signal") == "Buy"],
-                key=lambda r: r.get("Score") or 0, reverse=True,
+                key=lambda r: r.get("RS Rating") or 0, reverse=True,
             )
             default = buy_sorted[0]["Ticker"] if buy_sorted else ticker_options[0]
 
